@@ -1,3 +1,21 @@
+Amoeba a;
+
+void setup() {
+  size(800, 600);
+  //frameRate(3);
+  a = new Amoeba(width/2, height/2);
+}
+
+void draw() {
+  background(255);
+  a.update();
+  a.display();
+}
+
+void mouseClicked() {
+  a.setDestination(mouseX,mouseY);
+}
+
 class Amoeba extends Creature {
   float size;
   int initialSize     = 60;
@@ -184,71 +202,79 @@ class Amoeba extends Creature {
       shiftNode(upIdx, factor, destination);
       shiftNode(downIdx, factor, destination);
 
-      // This populates an ArrayList with values that we will use
-      // to determine whether a node needs to retract towards the 
-      // amoeba's position (because it is not affected by proximity
-      // to the closest node)
       if (!collapsingIndicesSet) {
         indicesToCollapse.set(upIdx, false);
         indicesToCollapse.set(downIdx, false);
       }
     }
-    
-    // Mark the closestNode as not needing to collapse
+
+    // This populates an ArrayList with values that we will use
+    // to determine whether a node needs to retract towards the 
+    // amoeba's position (because it is not affected by proximity
+    // to the closest node)
+
     if (!collapsingIndicesSet) {
       indicesToCollapse.set(closestNodeIndex, false);
       collapsingIndicesSet = true;
     }
 
     // Now move the nodes that are supposed to collapse
-    // towards the position of the amoeba
-    
+    // Move them towards the position of the amoeba
     for (int i = 0; i < indicesToCollapse.size();i++) {
-      
       // Check whether this node is collapsible
-      
       boolean collapsible = indicesToCollapse.get(i); 
       if (!collapsible) {
         continue;
       }
 
-      // Get the relevant collapsing node
-      
+      // Get the node
       PVector node = (PVector)expandedNodes.get(i);
-      
-      // Check how far it is from the amoeba position 
-      // (always 0,0 in the transformed space)
-      
-      PVector localPos   = new PVector(0, 0);
+      // Check how far it is from the position (translated to 0,0)
+      PVector localPos = new PVector(0, 0);
       PVector distVector = PVector.sub(localPos, node);
-      float   nodeDist   = distVector.mag();
+      float nodeDist = distVector.mag();
 
-      // Determine how far the node should be from the position of the amoeba
-
+      //float proximityToCenter = (footTolerance*0.5) + random(footTolerance);
       PVector contractedNodePos = (PVector)contractedNodes.get(i);
-      PVector proxDist          = PVector.sub(localPos, contractedNodePos);
-      float   proximityToCenter = proxDist.mag();
+      PVector proxDist = PVector.sub(localPos, contractedNodePos);
+      float proximityToCenter = proxDist.mag();
 
-      // Check whether the node is close enough to not need
-      // to move any further
-      
-      if (nodeDist <= proximityToCenter) { 
-        // Node is close enough, so mark it as not needing further updating
+      if (nodeDist <= proximityToCenter) { // Is this the right value to use?
+        // Close enough -- skip and set to false
+        // print("proximityToCenter: " + proximityToCenter + "\n");
         indicesToCollapse.set(i, false);
         continue;
       }
 
-      // The node still needs to contract towards the amoeba position.
-      // Get distance and then get the vector from the contracted position that was
-      // initialized for the node, and move the node towards that point
+      // Get distance and then get the vector from the initial angle that was
+      // stored for the node, and move the node towards the point at the initial 
+      // angle that corresponds with the distance
 
-      PVector move = PVector.sub(contractedNodePos, node);
+        PVector contractedPos = (PVector)contractedNodes.get(i);
+      PVector move = PVector.sub(contractedPos, node);
       move.normalize();
-      
-      // Some voodoo to make the node contract more quickly
-      // than the movement of the amoeba, but not too quickly
       move.mult(nodeMovementSpeed/2 * (nodeDist*0.05));
       node.add(move);
+
+      /*
+      
+       float angle = expandedNodesAngles.get(i);
+       PVector properPosition = positionWith(angle, proximityToCenter);
+       
+       properPosition.normalize();
+       print("angle: " + angle + ", properPosition: " + properPosition + "\n");
+       
+       properPosition.mult(nodeMovementSpeed/2 * (nodeDist*0.1));
+       properPosition.mult(-1);
+       node.add(properPosition);
+       
+       */
+
+      /*
+      distVector.normalize();
+       distVector.mult(nodeMovementSpeed/2 * (nodeDist*0.1));
+       node.add(distVector);
+       */
     }
   }
 
@@ -286,13 +312,13 @@ class Amoeba extends Creature {
   }
 
   void selectClosestNode() {
-
+    
     float deltaX = destination.x - position.x;
     float deltaY = destination.y - position.y;
-
+   
     float angle = degrees(atan2(deltaY, deltaX)); 
-    if (angle < 0) {
-      angle = 360 + angle;
+    if(angle < 0) {
+     angle = 360 + angle; 
     }
 
     int angleQuadrant;
@@ -330,7 +356,7 @@ class Amoeba extends Creature {
 
     closestNodeIndex = closestIndex;
     closestNodeSelected = true;
-
+    
 
     /* LEGACY IMPLEMENTATION BASED ON DISTANCE 
      // Initialize to a large size
@@ -393,4 +419,18 @@ class Amoeba extends Creature {
     }
   }
 }
+
+class Creature {
+  Creature() {
+  }
+
+  // Helper method for calculating positions
+  PVector positionWith(float angle, float length) {
+    float x = cos(radians(angle)) * length;
+    float y = sin(radians(angle)) * length;
+    return new PVector(x, y);
+  }
+
+}
+
 
