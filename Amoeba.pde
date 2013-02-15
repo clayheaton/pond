@@ -1,6 +1,6 @@
 class Amoeba extends Creature {
   float size;
-  int initialSize     = 60;
+  int initialSize     = 70;
   float initialRadius = initialSize   * 0.5;
   float footTolerance = initialRadius * 0.5;
 
@@ -9,7 +9,7 @@ class Amoeba extends Creature {
 
   int       numBaseNodes    = 18;
   int       maxNodes        = 20;
-  int       nodeChainLength = 3;
+  int       nodeChainLength = 2;
 
   float     baseAngleSpacing;
   float     angleSpacing;
@@ -32,6 +32,8 @@ class Amoeba extends Creature {
   boolean   hasFoodTarget;
   boolean   footAtTarget;
 
+  boolean   achievedRest;
+
   boolean   collapsingIndicesSet;
 
   float     movementSpeed     = 0.06;
@@ -53,6 +55,9 @@ class Amoeba extends Creature {
     size = initialSize;
     closestNodeIndex    = 0; // Initialize to avoid error
     closestNodeSelected = false;
+
+    achievedRest        = true;
+
     initializeNodes();
   }
 
@@ -104,6 +109,7 @@ class Amoeba extends Creature {
     closestNodeSelected  = false;
     footAtTarget         = false;
     collapsingIndicesSet = false;
+    achievedRest         = false;
 
     // Reset the indices
     for (int i = 0; i < numBaseNodes; i++) {
@@ -138,6 +144,23 @@ class Amoeba extends Creature {
         //print("nodes moving " + millis() + " \n");
         performNodeMovements();
       }
+    } 
+    else {
+      // The amoeba is at rest. Move to base position and then to 
+      // subsequent iterations of base position
+      if (!achievedRest) {
+        // Move into resting position after a move
+        
+        // Pick a new variation on the baseNodes
+        
+        moveToRest();
+      } 
+      else {
+        // Random chance to move to variation on base position
+        
+        
+        moveToRandomRest();
+      }
     }
   }
 
@@ -152,14 +175,20 @@ class Amoeba extends Creature {
 
     PVector distVect = PVector.sub(destination, closestNodeCopy);
     float dist = distVect.mag();
-    //print(" - dist: " + dist + "\n");
+
+    // Stop moving if the closest foot is close enough to the destination.
+    // This needs to change when the amoeba has a food target.
+
     if (dist < 2) {
       footAtTarget = true;
+
+      // TEMP MEASURE - When foot is at target, then move destination to current position
+      destination = position.get();
     }
 
     // Only perform additional movements if the foot isn't at the target
 
-    PVector dirToMove = PVector.sub(destination, closestNodeCopy);
+      PVector dirToMove = PVector.sub(destination, closestNodeCopy);
     dirToMove.normalize();
     dirToMove.mult(nodeMovementSpeed);
     closestNode.add(dirToMove);
@@ -193,7 +222,7 @@ class Amoeba extends Creature {
         indicesToCollapse.set(downIdx, false);
       }
     }
-    
+
     // Mark the closestNode as not needing to collapse
     if (!collapsingIndicesSet) {
       indicesToCollapse.set(closestNodeIndex, false);
@@ -202,23 +231,23 @@ class Amoeba extends Creature {
 
     // Now move the nodes that are supposed to collapse
     // towards the position of the amoeba
-    
+
     for (int i = 0; i < indicesToCollapse.size();i++) {
-      
+
       // Check whether this node is collapsible
-      
+
       boolean collapsible = indicesToCollapse.get(i); 
       if (!collapsible) {
         continue;
       }
 
       // Get the relevant collapsing node
-      
+
       PVector node = (PVector)expandedNodes.get(i);
-      
+
       // Check how far it is from the amoeba position 
       // (always 0,0 in the transformed space)
-      
+
       PVector localPos   = new PVector(0, 0);
       PVector distVector = PVector.sub(localPos, node);
       float   nodeDist   = distVector.mag();
@@ -231,7 +260,7 @@ class Amoeba extends Creature {
 
       // Check whether the node is close enough to not need
       // to move any further
-      
+
       if (nodeDist <= proximityToCenter) { 
         // Node is close enough, so mark it as not needing further updating
         indicesToCollapse.set(i, false);
@@ -244,7 +273,7 @@ class Amoeba extends Creature {
 
       PVector move = PVector.sub(contractedNodePos, node);
       move.normalize();
-      
+
       // Some voodoo to make the node contract more quickly
       // than the movement of the amoeba, but not too quickly
       move.mult(nodeMovementSpeed/2 * (nodeDist*0.05));
@@ -258,10 +287,46 @@ class Amoeba extends Creature {
     PVector nodeCopy = node.get();
     nodeCopy.add(position.get());
 
-    PVector dirToMove = PVector.sub(dest, nodeCopy);
+    // Check the angle between this point at the leading foot.
+    // If it is too large, then set the destination as leading node
+    // instead of the amoeba's destination. This will prevent feet from
+    // growing wider than they should be
+
+    PVector leadingNode  = (PVector)expandedNodes.get(closestNodeIndex);
+    float   nodeAngle    = angleToNodeFromPosition(node);
+    float   leadingAngle = angleToNodeFromPosition(leadingNode);
+    float   deltaAngle   = abs(nodeAngle - leadingAngle);
+    //print("deltaAngle: " + deltaAngle + "\n");
+
+    PVector actualDest;
+
+    // Uncertain how much this helps
+    // the point was to prevent adjacent nodes from creating 
+    // large angles between each other if they are the consecutive
+    // leading nodes for movement directives
+
+    if (deltaAngle > 2.0) {
+      actualDest = position.get();
+    } 
+    else {
+      actualDest = dest.get();
+    }
+
+    PVector dirToMove = PVector.sub(actualDest, nodeCopy);
     dirToMove.normalize();
     dirToMove.mult(nodeMovementSpeed * velocityAdjustment);
     node.add(dirToMove);
+  }
+
+  float angleToNodeFromPosition(PVector node) {
+    float deltaX = node.x - position.x;
+    float deltaY = node.y - position.y;
+
+    float angleToNode = degrees(atan2(deltaY, deltaX)); 
+    if (angleToNode < 0) {
+      angleToNode = 360 + angleToNode;
+    }
+    return angleToNode;
   }
 
   int neighborNodeIndex(int idx, boolean up) {
@@ -353,6 +418,36 @@ class Amoeba extends Creature {
      closestNodeSelected = true;
      //print("closestNodeIndex: " + closestNodeIndex);
      */
+  }
+  
+  void moveToRest() {
+    boolean done = true;
+    for (int i = 0; i < expandedNodes.size(); i++) {
+     PVector nodePos = (PVector)expandedNodes.get(i);
+     PVector basePos = (PVector)baseNodes.get(i); 
+     PVector diff    = PVector.sub(basePos,nodePos);
+     float   magDiff = diff.mag();
+     //print("nodePos: " + nodePos + ", basePos: " + basePos + ", magDiff: " + magDiff + "\n");
+     // Don't need to move
+     if (magDiff < (footTolerance)) {
+      continue; 
+     }
+     
+     done = false;
+     diff.normalize();
+     diff.mult(nodeMovementSpeed);
+     nodePos.add(diff);
+     
+    }
+    
+    if(done) {
+     achievedRest = true; 
+    }
+    
+  }
+  
+  void moveToRandomRest() {
+    
   }
 
   void display() {
