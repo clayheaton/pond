@@ -1,3 +1,5 @@
+import java.util.*;
+
 class Amoeba extends Creature {
   float size;
   int   initialSize     = 70;
@@ -109,7 +111,6 @@ class Amoeba extends Creature {
       }
 
       float len = initialRadius + adj;
-
       PVector toAdd = positionWith(thisAngle, len);
 
       baseNodes.add(toAdd.get());
@@ -140,8 +141,14 @@ class Amoeba extends Creature {
       baseNodesForResting.set(i, toAdd);
 
       // Determine the contracted nodes (for parts of the amoeba that must shrink)
-      // float contractedLength = initialRadius - random(footTolerance);
-      // contractedNodes.add(positionWith(thisAngle, contractedLength));
+      float contractedLength = initialRadius - random(footTolerance);
+      contractedNodes.set(i, positionWith(thisAngle, contractedLength));
+    }
+  }
+
+  void resetCollapsible() {
+    for (int i = 0; i < numBaseNodes; i++) {
+      indicesToCollapse.set(i, true);
     }
   }
 
@@ -160,9 +167,7 @@ class Amoeba extends Creature {
     slowedDown           = false;
 
     // Reset the indices
-    for (int i = 0; i < numBaseNodes; i++) {
-      indicesToCollapse.set(i, true);
-    }
+    resetCollapsible();
 
     recalculateBaseNodesForResting();
   }
@@ -204,10 +209,7 @@ class Amoeba extends Creature {
       } 
       else {
         // Random chance to move to variation on base position
-        float r = random(100);
-        if (r > 99.9) {
-          moveToRandomRest();
-        }
+        moveToRandomRest();
       }
     }
   }
@@ -248,6 +250,7 @@ class Amoeba extends Creature {
         spedUp            = false;
         footAtTarget      = true;
         destination = position.get();
+        resetCollapsible();
         return;
       }
     }
@@ -397,7 +400,7 @@ class Amoeba extends Creature {
       // Check whether the node is close enough to not need
       // to move any further
 
-      if (nodeDist <= proximityToCenter) { 
+      if (abs(nodeDist - proximityToCenter) < 5) { 
         // Node is close enough, so mark it as not needing further updating
         indicesToCollapse.set(i, false);
         continue;
@@ -414,6 +417,13 @@ class Amoeba extends Creature {
       // than the movement of the amoeba, but not too quickly
       move.mult(nodeMovementSpeed/2 * (nodeDist*0.05));
       node.add(move);
+    }
+
+    // Random chance to move one of the collapsing nodes to a different position
+    // TODO: Adjust to make enough movement so that it appears natural
+    float r = random(100);
+    if (r > 95) {
+      repositionNonChainedLeg(false, 0, true);
     }
   }
 
@@ -623,8 +633,103 @@ class Amoeba extends Creature {
   }
 
   void moveToRandomRest() {
-    achievedRest = false;
-    recalculateBaseNodesForResting();
+    // Chance for a leg to move a bit
+    float r = random(100);
+    if (r>98) {
+      repositionNonChainedLeg(false, 0, false);
+    }
+
+    // Entire shape reconfigures
+    float r2 = random(100);
+    if (r2 > 99.9) {
+      achievedRest = false;
+      recalculateBaseNodesForResting();
+    }
+  }
+
+  void repositionNonChainedLeg(boolean useIncomingIndex, int idx, boolean setContractedPosition) {
+    int index;
+    if (useIncomingIndex) {
+      index = idx;
+    } 
+    else {
+      index = (int)random(numBaseNodes);
+    }
+
+    boolean okToUse = indicesToCollapse.get(index);
+    if (okToUse == false) {
+      // increment index and recurse 
+      int maxIndex = indicesToCollapse.size() - 1;
+      if (index == maxIndex) {
+        index = 0;
+      } 
+      else {
+
+        index = randomUnchainedIndex();
+
+        // TODO: This needs work - might set a chained node
+        indicesToCollapse.set(index, true);
+      }
+      // print("index: " + index + " ");
+      repositionNonChainedLeg(true, index, setContractedPosition);
+      return;
+    } 
+    else {
+      // Logic to move the selected node
+      float thisAngle = baseNodesAngles.get(index);
+    
+      if (setContractedPosition == true) {
+        // This should happen while the amoeba is moving
+        float contractedLength = initialRadius - random(footTolerance);
+        contractedNodes.set(index, positionWith(thisAngle, contractedLength));
+        indicesToCollapse.set(index, true);
+      } 
+      else {
+        // This should happen when the amoeba is still
+        float adj = random(footTolerance);
+        if (random(100) > 50) {
+          adj *= -1;
+        }
+
+        float   len   = initialRadius + adj;
+        PVector toAdd = positionWith(thisAngle, len);
+        baseNodesForResting.set(index, toAdd);
+        achievedRest = false;
+      }
+    }
+  }
+
+  int randomUnchainedIndex() {
+    // Add the closestNodeIndex and the chained indices to an arraylist
+    
+    ArrayList<Integer> claimed = new ArrayList<Integer>();
+    claimed.add(closestNodeIndex);
+    int upIdx = closestNodeIndex;
+    int dnIdx = closestNodeIndex;
+    for (int i=0; i<nodeChainLength; i++) {
+      upIdx   = neighborNodeIndex(upIdx, true);      
+      dnIdx   = neighborNodeIndex(dnIdx, false);
+      claimed.add(upIdx);
+      claimed.add(dnIdx);
+    }
+    
+    ArrayList<Integer> allIndices = new ArrayList<Integer>();
+    for (int i=0; i < numBaseNodes; i++){
+     allIndices.add(i); 
+    }
+    
+    Set<Integer> claimedSet = new HashSet<Integer>(claimed);
+    Set<Integer> allInd     = new HashSet<Integer>(allIndices);
+    
+    allInd.removeAll(claimedSet);
+    
+    List<Integer> goodNumbers = new ArrayList<Integer>(allInd);
+    
+    int ran = (int)random(goodNumbers.size());
+    int selectedIdx = goodNumbers.get(ran);
+    //print("claimed set: " + claimedSet + "\n");
+    //print("selected idx: " + selectedIdx + "\n");
+    return selectedIdx;
   }
 
   void display() {
