@@ -1,25 +1,32 @@
 class Amoeba extends Creature {
   float size;
-  int initialSize     = 70;
-  float initialRadius = initialSize   * 0.5;
-  float footTolerance = initialRadius * 0.5;
+  int   initialSize     = 70;
+  float initialRadius   = initialSize   * 0.5;
+  float footTolerance   = initialRadius * 0.5;
+  float footTravelLimit = initialSize   * 2.0;
+  float footTooClose    = initialSize   * 0.75;
+
+  int       angleTolerance = 45;
 
   PVector   position;
   PVector   destination;
+  PVector   footDestination;
 
   int       numBaseNodes    = 18;
   int       maxNodes        = 20;
-  int       nodeChainLength = 2;
+  int       nodeChainLength = 3;
 
   float     baseAngleSpacing;
   float     angleSpacing;
 
   // Protected as references
   ArrayList baseNodes;
-  ArrayList baseNodesAngles;
+  ArrayList<Float> baseNodesAngles;
   ArrayList contractedNodes;
 
   // Used during execution
+  ArrayList baseNodesForResting;
+
   ArrayList expandedNodes;
   ArrayList<Float> expandedNodesAngles;
   ArrayList<Integer>expandedNodesAnglesQuadrants;
@@ -31,6 +38,7 @@ class Amoeba extends Creature {
   boolean   isMoving;
   boolean   hasFoodTarget;
   boolean   footAtTarget;
+  boolean   setNewFootTarget;
 
   boolean   achievedRest;
 
@@ -39,14 +47,23 @@ class Amoeba extends Creature {
   float     movementSpeed     = 0.06;
   float     nodeMovementSpeed = 0.1;
 
+  // Copies of the originals that we can revert to after speed changes
+  float     movementSpeedOrig     = movementSpeed;
+  float     nodeMovementSpeedOrig = nodeMovementSpeed;
+
+  boolean   slowedDown;
+  boolean   spedUp;
+
   Amoeba(float x, float y) {
     isMoving            = false;
     position            = new PVector(x, y);
     destination         = new PVector(x, y);
+    footDestination     = new PVector(x, y);
 
     baseNodes           = new ArrayList();
-    baseNodesAngles     = new ArrayList();
+    baseNodesAngles     = new ArrayList<Float>();
     contractedNodes     = new ArrayList();
+    baseNodesForResting = new ArrayList();
     expandedNodes       = new ArrayList();
     expandedNodesAngles = new ArrayList<Float>();
     expandedNodesAnglesQuadrants = new ArrayList<Integer>();
@@ -57,6 +74,9 @@ class Amoeba extends Creature {
     closestNodeSelected = false;
 
     achievedRest        = true;
+    slowedDown          = false;
+    spedUp              = false;
+    setNewFootTarget    = false;
 
     initializeNodes();
   }
@@ -90,8 +110,11 @@ class Amoeba extends Creature {
 
       float len = initialRadius + adj;
 
-      baseNodes.add(positionWith(thisAngle, len));
-      expandedNodes.add(positionWith(thisAngle, len));
+      PVector toAdd = positionWith(thisAngle, len);
+
+      baseNodes.add(toAdd.get());
+      baseNodesForResting.add(toAdd.get());
+      expandedNodes.add(toAdd.get());
 
       // Determine the contracted nodes (for parts of the amoeba that must shrink)
       float contractedLength = initialRadius - random(footTolerance);
@@ -102,19 +125,46 @@ class Amoeba extends Creature {
     }
   }
 
+  void recalculateBaseNodesForResting() {
+
+    for (int i = 0; i < numBaseNodes; i++) {
+      float thisAngle = baseNodesAngles.get(i); //i * angleSpacing;
+
+      float adj = random(footTolerance);
+      if (random(100) > 50) {
+        adj *= -1;
+      }
+
+      float   len   = initialRadius + adj;
+      PVector toAdd = positionWith(thisAngle, len);
+      baseNodesForResting.set(i, toAdd);
+
+      // Determine the contracted nodes (for parts of the amoeba that must shrink)
+      // float contractedLength = initialRadius - random(footTolerance);
+      // contractedNodes.add(positionWith(thisAngle, contractedLength));
+    }
+  }
+
   void setDestination(float x, float y) {
     destination.x = x;
     destination.y = y;
+
+    footDestination = destination.get();
     isMoving             = true;
     closestNodeSelected  = false;
     footAtTarget         = false;
+    setNewFootTarget     = false;
     collapsingIndicesSet = false;
     achievedRest         = false;
+    spedUp               = false;
+    slowedDown           = false;
 
     // Reset the indices
     for (int i = 0; i < numBaseNodes; i++) {
       indicesToCollapse.set(i, true);
     }
+
+    recalculateBaseNodesForResting();
   }
 
   void update() {
@@ -150,16 +200,14 @@ class Amoeba extends Creature {
       // subsequent iterations of base position
       if (!achievedRest) {
         // Move into resting position after a move
-        
-        // Pick a new variation on the baseNodes
-        
         moveToRest();
       } 
       else {
         // Random chance to move to variation on base position
-        
-        
-        moveToRandomRest();
+        float r = random(100);
+        if (r > 99.9) {
+          moveToRandomRest();
+        }
       }
     }
   }
@@ -173,22 +221,105 @@ class Amoeba extends Creature {
     PVector closestNodeCopy = closestNode.get();
     closestNodeCopy.add(position.get());
 
-    PVector distVect = PVector.sub(destination, closestNodeCopy);
+    PVector distVect = PVector.sub(footDestination, closestNodeCopy);
     float dist = distVect.mag();
+
+    if (debug) {
+      noFill();
+      stroke(0, 255, 0);
+      strokeWeight(1);
+      line(footDestination.x, footDestination.y, position.x, position.y);
+    }
 
     // Stop moving if the closest foot is close enough to the destination.
     // This needs to change when the amoeba has a food target.
 
-    if (dist < 2) {
-      footAtTarget = true;
+    if (setNewFootTarget == true) {
+      PVector distCheck    = PVector.sub(destination, position);
+      float   distCheckMag = distCheck.mag();
+      nodeMovementSpeed    = nodeMovementSpeedOrig;
+      // print("distCheckMag: " + distCheckMag + "\n");
 
-      // TEMP MEASURE - When foot is at target, then move destination to current position
-      destination = position.get();
+      if (distCheckMag <= 1.0) {
+        // print("Foot reached new target...\n\n");
+        nodeMovementSpeed = nodeMovementSpeedOrig;
+        movementSpeed     = movementSpeedOrig;
+        slowedDown        = false;
+        spedUp            = false;
+        footAtTarget      = true;
+        destination = position.get();
+        return;
+      }
+    }
+
+    // For long moves, the closest node sometimes misses the target by more than 2; 
+    // setting the distance check to 10 ensures that the conditions to terminate
+    // the move trigger above
+    if (dist < 10 && setNewFootTarget == false) {
+
+      // Set the footDestination to be along the same vector, but at a distance greater than the 
+      // current destination that is equal to the magnitude of the vector between the position
+      // of the amoeba and the closestNode
+      float   angleToFoot  = angleToNodeFromPosition(closestNode, true);
+      // print("angleToFoot: " + angleToFoot + "\n");
+      PVector distToFoot   = PVector.sub(closestNodeCopy, position); // represents translated position
+      float   newDist      = distToFoot.mag() * 2.75;
+      footDestination      = positionWith(angleToFoot, newDist);
+      footDestination.add(position);
+      setNewFootTarget     = true;
+
+      if (debug) {
+        noFill();
+        strokeWeight(1);
+        stroke(0, 255, 0);
+        line(closestNodeCopy.x, closestNodeCopy.y, position.x, position.y);
+      }
+
+      // print("Setting new foot target with distance: " + newDist + "\n");
+      // stopLoop = true;
     }
 
     // Only perform additional movements if the foot isn't at the target
 
-      PVector dirToMove = PVector.sub(destination, closestNodeCopy);
+    // Figure out how far we are from the amoeba's position - if it is greater than
+    // 3 times the original radius, then slow down the movement speed of the leading node
+
+    PVector distFromPosition = PVector.sub(position, closestNodeCopy);
+    float   distPos = distFromPosition.mag();
+
+    if (distPos > footTravelLimit && slowedDown == false) {
+      nodeMovementSpeed = abs(nodeMovementSpeedOrig) * - 0.2;
+      nodeMovementSpeed += nodeMovementSpeed;
+      movementSpeed     += 0.03;
+      // print("Slowing down leading node...\n");
+      slowedDown = true;
+      spedUp     = false;
+    } 
+    else if (distPos < footTooClose && spedUp == false) {
+      nodeMovementSpeed = abs(nodeMovementSpeedOrig) * 4; 
+      movementSpeed     = movementSpeedOrig;
+      // print("Speeding up leading node... \n");
+      spedUp     = true;
+      slowedDown = false;
+    } 
+    else if (distPos > footTooClose && distPos < footTravelLimit && (spedUp == true || slowedDown == true)) {
+      // The node is within normal range and either is going fast or slow..
+
+
+      // Don't want to immediately return to default if it just slowed down
+      // because it then will speed up again at normal speed and trigger a cycle of 
+      // alternating between normal and slow. Therefore, use a threshold to make sure
+      // that it remains slow for a little while
+      if ((slowedDown && distPos < (footTravelLimit - footTolerance)) || spedUp) {
+        nodeMovementSpeed = nodeMovementSpeedOrig; 
+        movementSpeed     = movementSpeedOrig;
+        // print("Speed returning to default...\n");
+        spedUp     = false;
+        slowedDown = false;
+      }
+    }
+
+    PVector dirToMove = PVector.sub(footDestination, closestNodeCopy);
     dirToMove.normalize();
     dirToMove.mult(nodeMovementSpeed);
     closestNode.add(dirToMove);
@@ -199,19 +330,25 @@ class Amoeba extends Creature {
 
     // Now handle the neighbor nodes
     for (int i=0; i < nodeChainLength; i++) {
-      float factor;
+      float speedToMove;
       if (i > 0) {
-        factor = 0.4/(i+1);
+        speedToMove = (0.4/(i+1) * nodeMovementSpeed);
       } 
       else {
-        factor = 0.4;
+        speedToMove = 0.4 * nodeMovementSpeed;
+      }
+
+      // If we are accelerating the movement of the closest node, then we don't want
+      // to add a speed factor to the chained nodes
+      if (spedUp) {
+        speedToMove = movementSpeed;
       }
 
       upIdx   = neighborNodeIndex(upIdx, true);      
       downIdx = neighborNodeIndex(downIdx, false);
 
-      shiftNode(upIdx, factor, destination);
-      shiftNode(downIdx, factor, destination);
+      shiftNode(upIdx, i + 1, speedToMove, footDestination);
+      shiftNode(downIdx, i + 1, speedToMove, footDestination);
 
       // This populates an ArrayList with values that we will use
       // to determine whether a node needs to retract towards the 
@@ -242,7 +379,6 @@ class Amoeba extends Creature {
       }
 
       // Get the relevant collapsing node
-
       PVector node = (PVector)expandedNodes.get(i);
 
       // Check how far it is from the amoeba position 
@@ -281,7 +417,13 @@ class Amoeba extends Creature {
     }
   }
 
-  void shiftNode(int idx, float velocityAdjustment, PVector dest) {
+  // idx is the index of the node that should shift
+  // idxOffset represents how far it is, in the array position, from the closestNode
+  // idxOffset is used to determine what percentage of the magnitude of the vector from the closestNode
+  // to the amoeba position will be used to set the movement vector for nodes that are too far
+  // off angle from the closest node
+
+    void shiftNode(int idx, int idxOffset, float speedToMove, PVector dest) {
 
     PVector node = (PVector)expandedNodes.get(idx);
     PVector nodeCopy = node.get();
@@ -293,8 +435,8 @@ class Amoeba extends Creature {
     // growing wider than they should be
 
     PVector leadingNode  = (PVector)expandedNodes.get(closestNodeIndex);
-    float   nodeAngle    = angleToNodeFromPosition(node);
-    float   leadingAngle = angleToNodeFromPosition(leadingNode);
+    float   nodeAngle    = angleToNodeFromPosition(node, true);
+    float   leadingAngle = angleToNodeFromPosition(leadingNode, true);
     float   deltaAngle   = abs(nodeAngle - leadingAngle);
     //print("deltaAngle: " + deltaAngle + "\n");
 
@@ -305,22 +447,83 @@ class Amoeba extends Creature {
     // large angles between each other if they are the consecutive
     // leading nodes for movement directives
 
-    if (deltaAngle > 2.0) {
-      actualDest = position.get();
+    boolean useAltSpeed = false;
+
+    // TODO: Better approach is not to check the angle, but to check distance from a registration
+    // point that is offset from the vector connecting the amoeba's position to the location
+    // of the node closest to the destination
+
+    if (deltaAngle > angleTolerance) {
+      //print("node at idx: " + idx + " is out of angle range with range: " + deltaAngle + "\n");
+      //print("leading angle: " + leadingAngle + "\n");
+      PVector distVector = PVector.sub(leadingNode, new PVector(0, 0));
+      float   dist = distVector.mag();
+
+      // How much to remove from the dist
+      float subFactor = (float)idxOffset / (nodeChainLength + 1);
+
+      //print("idxOffset/(nodeChainLength + 1): " + idxOffset + "/" + (nodeChainLength+1) + " = " + subFactor + "\n");
+
+      // If idxOffset is 1 and chain length is 3, then we will remove 1/4 of the dist
+      // and set it as the dist for the target to correct the angle
+      //print("subFactor: " + subFactor + ", dist: " + dist + ", ");
+
+      dist = dist - (dist * subFactor);
+      //print("new dist: " + dist + "\n\n");
+      // Distance needs to be a fraction of the leading node distance
+      PVector correctedVector = positionWith(leadingAngle, dist);
+
+      actualDest = correctedVector;
+      actualDest.add(position.get());
+
+      if (debug) {
+        noStroke();
+        fill(255, 0, 0);
+        ellipse(actualDest.x, actualDest.y, 5, 5);
+        stroke(0, 0, 255);
+        noFill();
+        strokeWeight(1);
+        PVector testV = leadingNode.get();
+        testV.add(position.get());
+        line(testV.x, testV.y, position.x, position.y);
+      }
+
+      //stopLoop = true;
+
+      useAltSpeed = true;
     } 
     else {
       actualDest = dest.get();
     }
 
     PVector dirToMove = PVector.sub(actualDest, nodeCopy);
+    float nodeDistToDest = dirToMove.mag();
     dirToMove.normalize();
-    dirToMove.mult(nodeMovementSpeed * velocityAdjustment);
+
+
+    if (useAltSpeed) {
+      dirToMove.mult(nodeMovementSpeed/(2 * (nodeDistToDest*0.05))); // TODO: Balance
+      //print("angle adjusting\n");
+    } 
+    else {
+      dirToMove.mult(speedToMove);
+    }
+
     node.add(dirToMove);
   }
 
-  float angleToNodeFromPosition(PVector node) {
-    float deltaX = node.x - position.x;
-    float deltaY = node.y - position.y;
+  // This ONLY works if they are in the same translated space
+  // The position ALWAYS is 0,0 in the local space
+  float angleToNodeFromPosition(PVector node, boolean translated) {
+    PVector pos;
+    if (translated) {
+      pos = new PVector(0, 0);
+    } 
+    else {
+      pos = position.get();
+    }
+    float deltaX = node.x - pos.x;
+    float deltaY = node.y - pos.y;
 
     float angleToNode = degrees(atan2(deltaY, deltaX)); 
     if (angleToNode < 0) {
@@ -374,7 +577,6 @@ class Amoeba extends Creature {
     else {
       angleQuadrant = 4;
     }
-    // print("angleQuadrant: " + angleQuadrant + "\n");
 
     float closest    = 9999;
     int closestIndex = -1;
@@ -392,62 +594,37 @@ class Amoeba extends Creature {
         closestIndex = i;
       }
     }
-
     closestNodeIndex = closestIndex;
     closestNodeSelected = true;
-
-
-    /* LEGACY IMPLEMENTATION BASED ON DISTANCE 
-     // Initialize to a large size
-     float dist = width * 99;
-     
-     for (int i=0; i < expandedNodes.size(); i++) {
-     PVector nodePos = ((PVector)expandedNodes.get(i)).get(); // have to copy the PVector
-     // Normalize the node positions to the coordinate space
-     nodePos.add(position.get());
-     
-     PVector diff = PVector.sub(destination, nodePos);
-     float thisDist = diff.mag();
-     if (thisDist < dist) {
-     // Candidate for closest node
-     dist = thisDist;
-     closestNodeIndex = i;
-     }
-     //print("Node index: " + i + ", thisDist: " + thisDist + ", nodePos: " + nodePos + ", closestNodeIndex: " + closestNodeIndex + "\n");
-     }
-     closestNodeSelected = true;
-     //print("closestNodeIndex: " + closestNodeIndex);
-     */
   }
-  
+
   void moveToRest() {
     boolean done = true;
     for (int i = 0; i < expandedNodes.size(); i++) {
-     PVector nodePos = (PVector)expandedNodes.get(i);
-     PVector basePos = (PVector)baseNodes.get(i); 
-     PVector diff    = PVector.sub(basePos,nodePos);
-     float   magDiff = diff.mag();
-     //print("nodePos: " + nodePos + ", basePos: " + basePos + ", magDiff: " + magDiff + "\n");
-     // Don't need to move
-     if (magDiff < (footTolerance)) {
-      continue; 
-     }
-     
-     done = false;
-     diff.normalize();
-     diff.mult(nodeMovementSpeed);
-     nodePos.add(diff);
-     
+      PVector nodePos = (PVector)expandedNodes.get(i);
+      PVector basePos = (PVector)baseNodesForResting.get(i); 
+      PVector diff    = PVector.sub(basePos, nodePos);
+      float   magDiff = diff.mag();
+      //print("nodePos: " + nodePos + ", basePos: " + basePos + ", magDiff: " + magDiff + "\n");
+      // Don't need to move
+      if (magDiff < (2)) {
+        continue;
+      }
+
+      done = false;
+      diff.normalize();
+      diff.mult(nodeMovementSpeed);
+      nodePos.add(diff);
     }
-    
-    if(done) {
-     achievedRest = true; 
+
+    if (done) {
+      achievedRest = true;
     }
-    
   }
-  
+
   void moveToRandomRest() {
-    
+    achievedRest = false;
+    recalculateBaseNodesForResting();
   }
 
   void display() {
@@ -455,7 +632,9 @@ class Amoeba extends Creature {
 
     translate(position.x, position.y);
     drawBody();
-    // drawNodes();
+    if (debug) {
+      drawNodes();
+    }
     popMatrix();
   }
 
@@ -480,6 +659,16 @@ class Amoeba extends Creature {
   }
 
   void drawNodes() {
+    popMatrix();
+
+    fill(0, 0, 255);
+    ellipse(destination.x, destination.y, 3, 3);
+    fill(0, 255, 0);
+    ellipse(position.x, position.y, 3, 3);
+
+    pushMatrix();
+    translate(position.x, position.y);
+
     fill(255, 0, 0, 100);
     noStroke();
     for (int i = 0; i < expandedNodes.size(); i++) {
