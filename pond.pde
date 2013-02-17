@@ -2,7 +2,7 @@ Amoeba a;
 
 // Debugging measures
 boolean stopLoop = false;
-boolean debug    = false;
+boolean debug    = true;
 
 void setup() {
   size(800, 600);

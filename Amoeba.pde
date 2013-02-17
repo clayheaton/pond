@@ -2,7 +2,7 @@ import java.util.*;
 
 class Amoeba extends Creature {
   float size;
-  int   initialSize     = 30;
+  int   initialSize     = 80;
   float initialRadius   = initialSize   * 0.5;
   float footTolerance   = initialRadius * 0.5;
   float footTravelLimit = initialSize   * 2.0;
@@ -435,53 +435,65 @@ class Amoeba extends Creature {
 
     void shiftNode(int idx, int idxOffset, float speedToMove, PVector dest) {
 
-    PVector node = (PVector)expandedNodes.get(idx);
-    PVector nodeCopy = node.get();
-    nodeCopy.add(position.get());
+      // Get a copy of the node to use in calculations
+      PVector node     = (PVector)expandedNodes.get(idx);
+      PVector nodeCopy = node.get();
+      
+      // Normalize it to the non-translated space
+      nodeCopy.add(position.get());
+
+      // Figure out how far away the leading node is from the position of the amoeba
+      PVector leadingNode  = (PVector)expandedNodes.get(closestNodeIndex);
+      float   leadingAngle = angleToNodeFromPosition(leadingNode, true);
+      PVector distVector   = PVector.sub(leadingNode, new PVector(0, 0));
+      float   dist         = distVector.mag();
+
+      // How much to remove from the that distance to accommodate this node
+      float subFactor      = (float)idxOffset / (nodeChainLength + 1);
+      
+      // If idxOffset is 1 and chain length is 3, then we will remove 1/4 of the dist
+      // and set it as the dist for the node's target
+      dist = dist - (dist * subFactor);
+
+      // Distance needs to be a fraction of the leading node distance
+      PVector nodeGoal = positionWith(leadingAngle, dist);
+      //nodeGoal.add(position.get());
+      //nodeCopy.add(position.get());
+      // Proximity of the node to the desired position
+      // float desiredDistFromLeadingNode = nodeGoal.mag();
+
+      // Thresholds for lateral movement for chained nodes
+      // Replacement for angle offset
+      float allowedMaxOffset = dist/2;
+      float allowedMinOffset = dist/6;
+      
+      // Vector from the node's actual position to its goal position
+      PVector vecFromNodeToExpectedPos = PVector.sub(nodeGoal,nodeCopy);
+
+      if(debug){
+        pushMatrix();
+        translate(position.x,position.y);
+       strokeWeight(1);
+       noFill();
+       stroke(255,0,0);
+       line(node.x,node.y,nodeGoal.x,nodeGoal.y); 
+       popMatrix();
+      }
 
     // Check the angle between this point at the leading foot.
     // If it is too large, then set the destination as leading node
     // instead of the amoeba's destination. This will prevent feet from
     // growing wider than they should be
 
-    PVector leadingNode  = (PVector)expandedNodes.get(closestNodeIndex);
     float   nodeAngle    = angleToNodeFromPosition(node, true);
-    float   leadingAngle = angleToNodeFromPosition(leadingNode, true);
     float   deltaAngle   = abs(nodeAngle - leadingAngle);
-    //print("deltaAngle: " + deltaAngle + "\n");
-
     PVector actualDest;
-
-    // Uncertain how much this helps
-    // the point was to prevent adjacent nodes from creating 
-    // large angles between each other if they are the consecutive
-    // leading nodes for movement directives
-
-    boolean useAltSpeed = false;
-
-    // TODO: Better approach is not to check the angle, but to check distance from a registration
-    // point that is offset from the vector connecting the amoeba's position to the location
-    // of the node closest to the destination
+    boolean useAltSpeed  = false;
 
     if (deltaAngle > angleTolerance) {
-      //print("node at idx: " + idx + " is out of angle range with range: " + deltaAngle + "\n");
-      //print("leading angle: " + leadingAngle + "\n");
-      PVector distVector = PVector.sub(leadingNode, new PVector(0, 0));
-      float   dist = distVector.mag();
 
-      // How much to remove from the dist
-      float subFactor = (float)idxOffset / (nodeChainLength + 1);
-
-      //print("idxOffset/(nodeChainLength + 1): " + idxOffset + "/" + (nodeChainLength+1) + " = " + subFactor + "\n");
-
-      // If idxOffset is 1 and chain length is 3, then we will remove 1/4 of the dist
-      // and set it as the dist for the target to correct the angle
-      //print("subFactor: " + subFactor + ", dist: " + dist + ", ");
-
-      dist = dist - (dist * subFactor);
-      //print("new dist: " + dist + "\n\n");
       // Distance needs to be a fraction of the leading node distance
-      PVector correctedVector = positionWith(leadingAngle, dist);
+      PVector correctedVector = positionWith(leadingAngle, dist); // VECTOR THAT I WANT TO USE TO MEASURE DISTANCE
 
       actualDest = correctedVector;
       actualDest.add(position.get());
@@ -677,7 +689,7 @@ class Amoeba extends Creature {
     else {
       // Logic to move the selected node
       float thisAngle = baseNodesAngles.get(index);
-    
+
       if (setContractedPosition == true) {
         // This should happen while the amoeba is moving
         float contractedLength = initialRadius - random(footTolerance);
@@ -701,7 +713,7 @@ class Amoeba extends Creature {
 
   int randomUnchainedIndex() {
     // Add the closestNodeIndex and the chained indices to an arraylist
-    
+
     ArrayList<Integer> claimed = new ArrayList<Integer>();
     claimed.add(closestNodeIndex);
     int upIdx = closestNodeIndex;
@@ -712,19 +724,19 @@ class Amoeba extends Creature {
       claimed.add(upIdx);
       claimed.add(dnIdx);
     }
-    
+
     ArrayList<Integer> allIndices = new ArrayList<Integer>();
-    for (int i=0; i < numBaseNodes; i++){
-     allIndices.add(i); 
+    for (int i=0; i < numBaseNodes; i++) {
+      allIndices.add(i);
     }
-    
+
     Set<Integer> claimedSet = new HashSet<Integer>(claimed);
     Set<Integer> allInd     = new HashSet<Integer>(allIndices);
-    
+
     allInd.removeAll(claimedSet);
-    
+
     List<Integer> goodNumbers = new ArrayList<Integer>(allInd);
-    
+
     int ran = (int)random(goodNumbers.size());
     int selectedIdx = goodNumbers.get(ran);
     //print("claimed set: " + claimedSet + "\n");
