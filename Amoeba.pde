@@ -2,7 +2,7 @@ import java.util.*;
 
 class Amoeba extends Creature {
   float size;
-  int   initialSize     = 70;
+  int   initialSize     = 30;
   float initialRadius   = initialSize   * 0.5;
   float footTolerance   = initialRadius * 0.5;
   float footTravelLimit = initialSize   * 2.0;
@@ -16,7 +16,7 @@ class Amoeba extends Creature {
 
   int       numBaseNodes    = 18;
   int       maxNodes        = 20;
-  int       nodeChainLength = 3;
+  int       nodeChainLength = 2;
 
   float     baseAngleSpacing;
   float     angleSpacing;
