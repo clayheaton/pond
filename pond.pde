@@ -6,6 +6,7 @@ boolean debug    = true;
 
 void setup() {
   size(800, 600);
+  smooth();
   // frameRate(10);
   a = new Amoeba(width/2, height/2);
 }

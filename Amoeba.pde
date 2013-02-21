@@ -464,68 +464,88 @@ class Amoeba extends Creature {
 
       // Thresholds for lateral movement for chained nodes
       // Replacement for angle offset
-      float allowedMaxOffset = dist/2;
-      float allowedMinOffset = dist/6;
+      float allowedMaxOffset = (dist * subFactor);
+      float allowedMinOffset = (dist * subFactor)/2;
       
       // Vector from the node's actual position to its goal position
-      PVector vecFromNodeToExpectedPos = PVector.sub(nodeGoal,nodeCopy);
+      PVector vecFromNodeToExpectedPos = PVector.sub(nodeGoal,node);
+      float   currentDist              = vecFromNodeToExpectedPos.mag();
 
       if(debug){
         pushMatrix();
         translate(position.x,position.y);
-       strokeWeight(1);
-       noFill();
-       stroke(255,0,0);
-       line(node.x,node.y,nodeGoal.x,nodeGoal.y); 
-       popMatrix();
+        strokeWeight(1);
+        noFill();
+        stroke(255,0,0);
+        line(node.x,node.y,nodeGoal.x,nodeGoal.y); 
+        popMatrix();
       }
 
-    // Check the angle between this point at the leading foot.
-    // If it is too large, then set the destination as leading node
-    // instead of the amoeba's destination. This will prevent feet from
-    // growing wider than they should be
-
-    float   nodeAngle    = angleToNodeFromPosition(node, true);
-    float   deltaAngle   = abs(nodeAngle - leadingAngle);
     PVector actualDest;
     boolean useAltSpeed  = false;
 
-    if (deltaAngle > angleTolerance) {
-
-      // Distance needs to be a fraction of the leading node distance
-      PVector correctedVector = positionWith(leadingAngle, dist); // VECTOR THAT I WANT TO USE TO MEASURE DISTANCE
-
-      actualDest = correctedVector;
-      actualDest.add(position.get());
-
-      if (debug) {
-        noStroke();
-        fill(255, 0, 0);
-        ellipse(actualDest.x, actualDest.y, 5, 5);
-        stroke(0, 0, 255);
-        noFill();
-        strokeWeight(1);
-        PVector testV = leadingNode.get();
-        testV.add(position.get());
-        line(testV.x, testV.y, position.x, position.y);
+    if (currentDist > allowedMaxOffset) {
+      // The node is too far away from the nodeGoal
+      
+      if(debug){
+       
+       print("Chained node is too far from its goal. Dist: " + currentDist + ", allowedMax: " + allowedMaxOffset + "\n"); 
       }
-
-      //stopLoop = true;
-
+      
+      // Move into position at a slightly faster speed than normal
       useAltSpeed = true;
-    } 
-    else {
-      actualDest = dest.get();
+      
+      // Set the additive vector to move towards the goal
+      actualDest  = nodeGoal;
+      actualDest.add(position.get());
+      
+    } else if(currentDist < allowedMinOffset) {
+      // The node is too close to the nodeGoal -- move away a bit
+      
+      useAltSpeed = true;
+      
+      if(debug){
+       print("Chained node is too close to its goal\n"); 
+       fill(255,0,0);
+       noStroke();
+       pushMatrix();
+       translate(position.x,position.y);
+       ellipse(node.x,node.y,5,5);
+       popMatrix();
+      }
+      
+      // TODO: Implement - this is wrong
+      // http://stackoverflow.com/questions/1243614/how-do-i-calculate-the-normal-vector-of-a-line-segment
+      actualDest  = new PVector(dest.y, -dest.x);// dest.get(); // Get normal
+      
+      
+    } else {
+      // The node is in an acceptible position, move towards the destination
+      
+      actualDest  = dest.get();
     }
 
-    PVector dirToMove = PVector.sub(actualDest, nodeCopy);
-    float nodeDistToDest = dirToMove.mag();
+    PVector dirToMove      = PVector.sub(actualDest, nodeCopy);
+    
+    if(debug){
+     pushMatrix();
+     noStroke();
+     fill(180,180,120);
+     ellipse(actualDest.x,actualDest.y,5,5);
+     
+     //translate(position.x,position.y);
+     //stroke(255,0,255);
+     //line(nodeCopy.x,nodeCopy.y,actualDest.x,actualDest.y);
+     popMatrix(); 
+     //noLoop();
+    }
+    
+    float   nodeDistToDest = dirToMove.mag();
     dirToMove.normalize();
 
-
     if (useAltSpeed) {
-      dirToMove.mult(nodeMovementSpeed/(2 * (nodeDistToDest*0.05))); // TODO: Balance
-      //print("angle adjusting\n");
+      //dirToMove.mult(nodeMovementSpeed/(2 * (nodeDistToDest*0.05)));
+      dirToMove.mult(.1);
     } 
     else {
       dirToMove.mult(speedToMove);
