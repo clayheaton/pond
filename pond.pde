@@ -2,7 +2,7 @@ Amoeba a;
 
 // Debugging measures
 boolean stopLoop = false;
-boolean debug    = true;
+boolean debug    = false;
 
 void setup() {
   size(800, 600);
@@ -15,12 +15,12 @@ void draw() {
   background(255);
   a.update();
   a.display();
-  if(stopLoop) {
-   noLoop(); 
+  if (stopLoop) {
+    noLoop();
   }
 }
 
 void mouseClicked() {
-  a.setDestination(mouseX,mouseY);
+  a.setDestination(mouseX, mouseY);
 }
 

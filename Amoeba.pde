@@ -9,9 +9,8 @@ class Amoeba extends Creature {
   float footTooClose    = initialSize   * 0.75;
 
   int       angleTolerance = 45;
+  float     areaTolerance  = 0.2; // Can grow or shrink by 20 percent without triggering a fix
 
-  PVector   position;
-  PVector   destination;
   PVector   footDestination;
 
   int       numBaseNodes    = 18;
@@ -47,7 +46,7 @@ class Amoeba extends Creature {
   boolean   collapsingIndicesSet;
 
   float     movementSpeed                  = 0.06;
-  float     nodeMovementSpeed              = 0.1;
+  float     nodeMovementSpeed              = 0.08; // 0.1
   float     newFootDestMagMultiplier       = 2.0;
   float     chainedNodeFastSpeedMultiplier = 3.0;
 
@@ -57,6 +56,11 @@ class Amoeba extends Creature {
 
   boolean   slowedDown;
   boolean   spedUp;
+
+  boolean   areaOutOfRange;
+  boolean   areaTooSmall;
+  boolean   expand;
+  boolean   contract;
 
 
 
@@ -85,8 +89,13 @@ class Amoeba extends Creature {
     slowedDown          = false;
     spedUp              = false;
     setNewFootTarget    = false;
+    areaOutOfRange      = false;
+    areaTooSmall        = false;
+    expand              = false;
+    contract            = false;
 
     initializeNodes();
+    setUpBrain();
   }
 
 
@@ -134,8 +143,19 @@ class Amoeba extends Creature {
       // Initialize all to true
       indicesToCollapse.add(true);
     }
-  }
 
+    // Calculate the initial area
+    initialArea = abs(creatureArea(expandedNodes));
+    // print("Creature initial area: " + initialArea + "\n");
+    // TODO: recalcualte the initialArea if the creature grows by eating something.
+  }
+  
+  
+  
+  
+  void setUpBrain(){
+    
+  }
 
 
 
@@ -240,10 +260,55 @@ class Amoeba extends Creature {
         moveToRandomRest();
       }
     }
+
+    checkAreaForFit();
   }
 
 
 
+
+  void checkAreaForFit() {
+    currentArea = abs(creatureArea(expandedNodes));
+    // print("currentArea: " + currentArea + "\n");
+
+    float big, little;
+    areaTooSmall = false;
+    if (initialArea >= currentArea) {
+      // print("  initialArea larger than currentArea\n");
+      big    = initialArea;
+      little = currentArea;
+      areaTooSmall = true;
+    } 
+    else {
+      // print("  currentArea larger than initialArea\n");
+      big    = currentArea;
+      little = initialArea;
+    }
+
+    if ((big - little) / initialArea < areaTolerance) {
+      // print("  ... but is within bounds.\n");
+      areaOutOfRange = false;
+      expand   = false;
+      contract = false;
+      return;
+    } 
+    else {
+      // print("  (big - little) / initialArea = (" + big + " - " + little + ") / " + initialArea + " = " + ((big - little)/initialArea) + "\n");
+      areaOutOfRange = true;
+    }
+
+    // Probably can remove the areaOutOfRange variable
+    if (areaOutOfRange) {
+      if (areaTooSmall) {
+        expand   = true;
+        contract = false;
+      } 
+      else {
+        expand   = false;
+        contract = true;
+      }
+    }
+  }
 
 
 
@@ -359,7 +424,7 @@ class Amoeba extends Creature {
 
 
 
-  PVector dirToMove = PVector.sub(footDestination, closestNodeCopy);
+    PVector dirToMove = PVector.sub(footDestination, closestNodeCopy);
     dirToMove.normalize();
     dirToMove.mult(nodeMovementSpeed);
     closestNode.add(dirToMove);

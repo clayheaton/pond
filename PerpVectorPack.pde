@@ -70,30 +70,39 @@ class PerpVectorPack {
     perpVectorPoints.add(perpVector.get());
   }
 
+
+
   public PVector ptOnOriginalLine() { 
     return ptOnOriginalLine(0);
   }
 
   public PVector ptOnOriginalLine(int idx) {
     PVector thePoint = (PVector)pointsOnLine.get(idx);
-    return thePoint.get();
+    return  thePoint.get();
   }
+
+
 
   public PVector perpVectorPt() { 
     return perpVectorPt(0);
   }
-  
-  public float perpVectorPtDistFromLine() {
-    PVector ptOnLine = ptOnOriginalLine();
-    PVector perpPt   = perpVectorPt();
-    
-    PVector diff     = PVector.sub(perpPt, ptOnLine);
-    return diff.mag();
-  }
 
   public PVector perpVectorPt(int idx) {
     PVector thePoint = (PVector)perpVectorPoints.get(idx);
-    return thePoint.get();
+    return  thePoint.get();
+  }
+
+
+
+  public float perpVectorPtDistFromLine() {
+    return perpVectorPtDistFromLine(0);
+  }
+
+  public float perpVectorPtDistFromLine(int idx) {
+    PVector ptOnLine = ptOnOriginalLine(idx);
+    PVector perpPt   = perpVectorPt(idx);
+    PVector diff     = PVector.sub(perpPt, ptOnLine);
+    return  diff.mag();
   }
 }
 
