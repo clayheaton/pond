@@ -46,8 +46,10 @@ class Amoeba extends Creature {
 
   boolean   collapsingIndicesSet;
 
-  float     movementSpeed     = 0.06;
-  float     nodeMovementSpeed = 0.1;
+  float     movementSpeed                  = 0.06;
+  float     nodeMovementSpeed              = 0.1;
+  float     newFootDestMagMultiplier       = 2.0;
+  float     chainedNodeFastSpeedMultiplier = 3.0;
 
   // Copies of the originals that we can revert to after speed changes
   float     movementSpeedOrig     = movementSpeed;
@@ -55,6 +57,10 @@ class Amoeba extends Creature {
 
   boolean   slowedDown;
   boolean   spedUp;
+
+
+
+
 
   Amoeba(float x, float y) {
     isMoving            = false;
@@ -82,6 +88,10 @@ class Amoeba extends Creature {
 
     initializeNodes();
   }
+
+
+
+
 
   void initializeNodes() {
     baseAngleSpacing = 360.0 / numBaseNodes;
@@ -126,6 +136,10 @@ class Amoeba extends Creature {
     }
   }
 
+
+
+
+
   void recalculateBaseNodesForResting() {
 
     for (int i = 0; i < numBaseNodes; i++) {
@@ -146,11 +160,19 @@ class Amoeba extends Creature {
     }
   }
 
+
+
+
+
   void resetCollapsible() {
     for (int i = 0; i < numBaseNodes; i++) {
       indicesToCollapse.set(i, true);
     }
   }
+
+
+
+
 
   void setDestination(float x, float y) {
     destination.x = x;
@@ -168,13 +190,19 @@ class Amoeba extends Creature {
 
     // Reset the indices
     resetCollapsible();
-
     recalculateBaseNodesForResting();
   }
+
+
+
 
   void update() {
     performMove();
   }
+
+
+
+
 
   void performMove() {
     if (isMoving) {
@@ -213,6 +241,11 @@ class Amoeba extends Creature {
       }
     }
   }
+
+
+
+
+
 
   void performNodeMovements() {
     if (!closestNodeSelected) {
@@ -266,7 +299,7 @@ class Amoeba extends Creature {
       float   angleToFoot  = angleToNodeFromPosition(closestNode, true);
       // print("angleToFoot: " + angleToFoot + "\n");
       PVector distToFoot   = PVector.sub(closestNodeCopy, position); // represents translated position
-      float   newDist      = distToFoot.mag() * 2.75;
+      float   newDist      = distToFoot.mag() * newFootDestMagMultiplier;
       footDestination      = positionWith(angleToFoot, newDist);
       footDestination.add(position);
       setNewFootTarget     = true;
@@ -322,7 +355,11 @@ class Amoeba extends Creature {
       }
     }
 
-    PVector dirToMove = PVector.sub(footDestination, closestNodeCopy);
+
+
+
+
+  PVector dirToMove = PVector.sub(footDestination, closestNodeCopy);
     dirToMove.normalize();
     dirToMove.mult(nodeMovementSpeed);
     closestNode.add(dirToMove);
@@ -350,8 +387,8 @@ class Amoeba extends Creature {
       upIdx   = neighborNodeIndex(upIdx, true);      
       downIdx = neighborNodeIndex(downIdx, false);
 
-      shiftNode(upIdx, i + 1, speedToMove, footDestination);
-      shiftNode(downIdx, i + 1, speedToMove, footDestination);
+      shiftNode(upIdx, i + 1, speedToMove, footDestination, true);
+      shiftNode(downIdx, i + 1, speedToMove, footDestination, false);
 
       // This populates an ArrayList with values that we will use
       // to determine whether a node needs to retract towards the 
@@ -427,125 +464,97 @@ class Amoeba extends Creature {
     }
   }
 
-  // idx is the index of the node that should shift
-  // idxOffset represents how far it is, in the array position, from the closestNode
-  // idxOffset is used to determine what percentage of the magnitude of the vector from the closestNode
-  // to the amoeba position will be used to set the movement vector for nodes that are too far
-  // off angle from the closest node
 
-    void shiftNode(int idx, int idxOffset, float speedToMove, PVector dest) {
 
-      // Get a copy of the node to use in calculations
-      PVector node     = (PVector)expandedNodes.get(idx);
-      PVector nodeCopy = node.get();
-      
-      // Normalize it to the non-translated space
-      nodeCopy.add(position.get());
 
-      // Figure out how far away the leading node is from the position of the amoeba
-      PVector leadingNode  = (PVector)expandedNodes.get(closestNodeIndex);
-      float   leadingAngle = angleToNodeFromPosition(leadingNode, true);
-      PVector distVector   = PVector.sub(leadingNode, new PVector(0, 0));
-      float   dist         = distVector.mag();
 
-      // How much to remove from the that distance to accommodate this node
-      float subFactor      = (float)idxOffset / (nodeChainLength + 1);
-      
-      // If idxOffset is 1 and chain length is 3, then we will remove 1/4 of the dist
-      // and set it as the dist for the node's target
-      dist = dist - (dist * subFactor);
+  void shiftNode(int idx, int idxOffset, float speedToMove, PVector dest, boolean right) {
+    // idx is the index of the node that should shift
+    // idxOffset represents how far it is, in the array position, from the closestNode
+    // idxOffset is used to determine what percentage of the magnitude of the vector from the closestNode
+    // to the amoeba position will be used to set the movement vector for nodes that are too far
+    // off angle from the closest node
 
-      // Distance needs to be a fraction of the leading node distance
-      PVector nodeGoal = positionWith(leadingAngle, dist);
-      //nodeGoal.add(position.get());
-      //nodeCopy.add(position.get());
-      // Proximity of the node to the desired position
-      // float desiredDistFromLeadingNode = nodeGoal.mag();
+    // Get a copy of the node to use in calculations
+    PVector node     = (PVector)expandedNodes.get(idx);
+    PVector nodeCopy = node.get();
 
-      // Thresholds for lateral movement for chained nodes
-      // Replacement for angle offset
-      float allowedMaxOffset = (dist * subFactor);
-      float allowedMinOffset = (dist * subFactor)/2;
-      
-      // Vector from the node's actual position to its goal position
-      PVector vecFromNodeToExpectedPos = PVector.sub(nodeGoal,node);
-      float   currentDist              = vecFromNodeToExpectedPos.mag();
+    // Normalize it to the non-translated space
+    nodeCopy.add(position.get());
 
-      if(debug){
-        pushMatrix();
-        translate(position.x,position.y);
-        strokeWeight(1);
-        noFill();
-        stroke(255,0,0);
-        line(node.x,node.y,nodeGoal.x,nodeGoal.y); 
-        popMatrix();
-      }
+    // Figure out how far away the leading node is from the position of the amoeba
+    PVector leadingNode  = (PVector)expandedNodes.get(closestNodeIndex);
+    float   leadingAngle = angleToNodeFromPosition(leadingNode, true);
+    PVector distVector   = PVector.sub(leadingNode, new PVector(0, 0));
+    float   dist         = distVector.mag();
+    float   origDist     = dist;
+    // How much to remove from the that distance to accommodate this node
+    float subFactor      = (float)idxOffset / (nodeChainLength + 1);
 
-    PVector actualDest;
-    boolean useAltSpeed  = false;
+    // If idxOffset is 1 and chain length is 3, then we will remove 1/4 of the dist
+    // and set it as the dist for the node's target
+    dist = dist - (dist * subFactor);
+
+    float newDist = dist/origDist;
+    float lenAdjust = newDist;
+
+    // Get the normal at that distance and offset
+    PerpVectorPack pack = new PerpVectorPack(distVector, lenAdjust, (1-lenAdjust) * 0.3, right);
+
+    // Set the normal to be the nodeGoal
+    PVector nodeGoal = pack.perpVectorPt();
+
+    // Thresholds for lateral movement for chained nodes
+    // Replacement for angle offset
+    float rad = pack.perpVectorPtDistFromLine();
+
+    float allowedMaxOffset = rad * 0.9;
+    float allowedMinOffset = rad * 0.1;
+
+    // Vector from the node's actual position to its goal position
+    PVector vecFromNodeToExpectedPos = PVector.sub(nodeGoal, node);
+    float   currentDist              = vecFromNodeToExpectedPos.mag();
+    boolean moveFaster               = false;
 
     if (currentDist > allowedMaxOffset) {
-      // The node is too far away from the nodeGoal
-      
-      if(debug){
-       
-       print("Chained node is too far from its goal. Dist: " + currentDist + ", allowedMax: " + allowedMaxOffset + "\n"); 
-      }
-      
-      // Move into position at a slightly faster speed than normal
-      useAltSpeed = true;
-      
+      moveFaster = true;
+
       // Set the additive vector to move towards the goal
-      actualDest  = nodeGoal;
-      actualDest.add(position.get());
-      
-    } else if(currentDist < allowedMinOffset) {
-      // The node is too close to the nodeGoal -- move away a bit
-      
-      useAltSpeed = true;
-      
-      if(debug){
-       print("Chained node is too close to its goal\n"); 
-       fill(255,0,0);
-       noStroke();
-       pushMatrix();
-       translate(position.x,position.y);
-       ellipse(node.x,node.y,5,5);
-       popMatrix();
-      }
-      
-      // TODO: Implement - this is wrong
-      // http://stackoverflow.com/questions/1243614/how-do-i-calculate-the-normal-vector-of-a-line-segment
-      actualDest  = new PVector(dest.y, -dest.x);// dest.get(); // Get normal
-      
-      
-    } else {
+      nodeGoal.add(position.get());
+    } 
+    else if (currentDist < allowedMinOffset) {
+      moveFaster = true;
+
+      // New normal that is further from the orig vector
+      PerpVectorPack newPack = new PerpVectorPack(distVector, lenAdjust, (1-lenAdjust) * 0.5, right);
+      nodeGoal               = newPack.perpVectorPt();
+      nodeGoal.add(position.get());
+    } 
+    else {
       // The node is in an acceptible position, move towards the destination
-      
-      actualDest  = dest.get();
+      moveFaster = false;
+      nodeGoal    = dest.get();
     }
 
-    PVector dirToMove      = PVector.sub(actualDest, nodeCopy);
-    
-    if(debug){
-     pushMatrix();
-     noStroke();
-     fill(180,180,120);
-     ellipse(actualDest.x,actualDest.y,5,5);
-     
-     //translate(position.x,position.y);
-     //stroke(255,0,255);
-     //line(nodeCopy.x,nodeCopy.y,actualDest.x,actualDest.y);
-     popMatrix(); 
-     //noLoop();
+    if (debug) {
+      if (moveFaster) {
+        pushMatrix();
+        noStroke();
+        fill(0);
+        ellipse(nodeGoal.x, nodeGoal.y, 5, 5);
+        noFill();
+        stroke(0);
+        line(nodeCopy.x, nodeCopy.y, nodeGoal.x, nodeGoal.y);
+        popMatrix();
+      }
     }
-    
+
+    PVector dirToMove      = PVector.sub(nodeGoal, nodeCopy);
     float   nodeDistToDest = dirToMove.mag();
     dirToMove.normalize();
 
-    if (useAltSpeed) {
-      //dirToMove.mult(nodeMovementSpeed/(2 * (nodeDistToDest*0.05)));
-      dirToMove.mult(.1);
+    if (moveFaster) {
+      dirToMove.mult(speedToMove * chainedNodeFastSpeedMultiplier);
     } 
     else {
       dirToMove.mult(speedToMove);
@@ -554,9 +563,12 @@ class Amoeba extends Creature {
     node.add(dirToMove);
   }
 
-  // This ONLY works if they are in the same translated space
-  // The position ALWAYS is 0,0 in the local space
+
+
+
   float angleToNodeFromPosition(PVector node, boolean translated) {
+    // This ONLY works if they are in the same translated space
+    // The position ALWAYS is 0,0 in the local space
     PVector pos;
     if (translated) {
       pos = new PVector(0, 0);
@@ -573,6 +585,10 @@ class Amoeba extends Creature {
     }
     return angleToNode;
   }
+
+
+
+
 
   int neighborNodeIndex(int idx, boolean up) {
     int offset;
@@ -594,6 +610,10 @@ class Amoeba extends Creature {
 
     return newIndex;
   }
+
+
+
+
 
   void selectClosestNode() {
 
@@ -640,6 +660,10 @@ class Amoeba extends Creature {
     closestNodeSelected = true;
   }
 
+
+
+
+
   void moveToRest() {
     boolean done = true;
     for (int i = 0; i < expandedNodes.size(); i++) {
@@ -664,6 +688,10 @@ class Amoeba extends Creature {
     }
   }
 
+
+
+
+
   void moveToRandomRest() {
     // Chance for a leg to move a bit
     float r = random(100);
@@ -678,6 +706,10 @@ class Amoeba extends Creature {
       recalculateBaseNodesForResting();
     }
   }
+
+
+
+
 
   void repositionNonChainedLeg(boolean useIncomingIndex, int idx, boolean setContractedPosition) {
     int index;
@@ -731,6 +763,10 @@ class Amoeba extends Creature {
     }
   }
 
+
+
+
+
   int randomUnchainedIndex() {
     // Add the closestNodeIndex and the chained indices to an arraylist
 
@@ -764,6 +800,10 @@ class Amoeba extends Creature {
     return selectedIdx;
   }
 
+
+
+  /* DRAWING */
+
   void display() {
     pushMatrix();
 
@@ -774,6 +814,10 @@ class Amoeba extends Creature {
     }
     popMatrix();
   }
+
+
+
+
 
   void drawBody() {
     fill(180, 100);
@@ -794,6 +838,10 @@ class Amoeba extends Creature {
     curveVertex(secondPt.x, secondPt.y);
     endShape();
   }
+
+
+
+
 
   void drawNodes() {
     popMatrix();
