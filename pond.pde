@@ -1,5 +1,8 @@
 Amoeba a;
 
+int timer;
+int lastMillisCount, millisCount;
+
 // Debugging measures
 boolean stopLoop = false;
 boolean debug    = false;
@@ -9,9 +12,18 @@ void setup() {
   smooth();
   // frameRate(10);
   a = new Amoeba(width/2, height/2);
+  timer = 0;
+  lastMillisCount = 0;
+  millisCount     = 0;
 }
 
 void draw() {
+  
+  if(millis() - lastMillisCount >= 1000) {
+    timer      += 1;
+    lastMillisCount = millis();
+  }
+  
   background(255);
   a.update();
   a.display();

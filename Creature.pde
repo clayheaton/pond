@@ -2,15 +2,51 @@ class Creature {
   PVector   position;
   PVector   destination;
   float     initialArea, currentArea;
+  int       foodMax;
+  int       foodMin;
+  int       currentFood;
+  int       metabolismRate;
+  int       lastTicCount;
+
+  boolean   okToUpdateFood;
 
   Brain brain;
 
   Creature() {
     initializeBrain();
+    foodMax              = 100;
+    foodMin              = 0;
+    currentFood          = 50;
+    metabolismRate       = 5; // Represents number of seconds between metabolism adjustments; higher == slower
+    okToUpdateFood       = false;
+    lastTicCount         = 0;
   }
 
   void initializeBrain() {
     brain = new Brain();
+  }
+
+  void updateFoodLevel() {
+
+    if (metabolismRate == 1) {
+      if (timer > lastTicCount) {
+        print("food: " + currentFood + "\n");
+        currentFood -=1;
+        lastTicCount = timer;
+      }
+    } 
+    else {
+
+      if (okToUpdateFood) {
+        if (timer % metabolismRate == 0) {
+          currentFood   -= 1;
+          okToUpdateFood = false;
+          print("food: " + currentFood + "\n");
+        }
+      }
+
+      if (timer % metabolismRate > 0) okToUpdateFood = true;
+    }
   }
 
   // Helper method for calculating positions

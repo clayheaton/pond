@@ -149,12 +149,11 @@ class Amoeba extends Creature {
     // print("Creature initial area: " + initialArea + "\n");
     // TODO: recalcualte the initialArea if the creature grows by eating something.
   }
-  
-  
-  
-  
-  void setUpBrain(){
-    
+
+
+
+
+  void setUpBrain() {
   }
 
 
@@ -217,6 +216,7 @@ class Amoeba extends Creature {
 
 
   void update() {
+    updateFoodLevel();
     performMove();
   }
 
@@ -563,8 +563,11 @@ class Amoeba extends Creature {
     float newDist = dist/origDist;
     float lenAdjust = newDist;
 
+    float widthFactor = 0.3;
+    if (expand)   widthFactor = 0.6;
+    if (contract) widthFactor = 0.15;
     // Get the normal at that distance and offset
-    PerpVectorPack pack = new PerpVectorPack(distVector, lenAdjust, (1-lenAdjust) * 0.3, right);
+    PerpVectorPack pack = new PerpVectorPack(distVector, lenAdjust, (1-lenAdjust) * widthFactor, right);
 
     // Set the normal to be the nodeGoal
     PVector nodeGoal = pack.perpVectorPt();
@@ -613,6 +616,8 @@ class Amoeba extends Creature {
         popMatrix();
       }
     }
+
+    if (expand || contract) moveFaster = true;
 
     PVector dirToMove      = PVector.sub(nodeGoal, nodeCopy);
     float   nodeDistToDest = dirToMove.mag();
@@ -819,6 +824,9 @@ class Amoeba extends Creature {
         if (random(100) > 50) {
           adj *= -1;
         }
+        
+        if(expand) adj   = abs(adj);
+        if(contract) adj = -1 * abs(adj);
 
         float   len   = initialRadius + adj;
         PVector toAdd = positionWith(thisAngle, len);
@@ -887,6 +895,15 @@ class Amoeba extends Creature {
   void drawBody() {
     fill(180, 100);
     stroke(90, 100);
+
+    if (debug) {
+      if (contract) {
+        fill(255, 0, 0, 100);
+      } 
+      else if (expand) {
+        fill(0, 0, 255, 100);
+      }
+    }
 
     beginShape();
     // First control point
