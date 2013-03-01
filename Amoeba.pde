@@ -154,6 +154,15 @@ class Amoeba extends Creature {
 
 
   void setUpBrain() {
+
+    AmoebaBrainStateForaging absf = new AmoebaBrainStateForaging(this);
+    AmoebaBrainStateResting  absr = new AmoebaBrainStateResting(this);
+
+    brain.addState("amoeba_brain_state_foraging", absf);
+    brain.addState("amoeba_brain_state_resting", absr);
+
+    // Set the active state
+    brain.setState("amoeba_brain_state_resting");
   }
 
 
@@ -216,8 +225,10 @@ class Amoeba extends Creature {
 
 
   void update() {
+    brain.think();
     updateFoodLevel();
     performMove();
+    //print("Amoeba brain: " + brainActivity + "\n");
   }
 
 
@@ -824,9 +835,9 @@ class Amoeba extends Creature {
         if (random(100) > 50) {
           adj *= -1;
         }
-        
-        if(expand) adj   = abs(adj);
-        if(contract) adj = -1 * abs(adj);
+
+        if (expand) adj   = abs(adj);
+        if (contract) adj = -1 * abs(adj);
 
         float   len   = initialRadius + adj;
         PVector toAdd = positionWith(thisAngle, len);
@@ -942,6 +953,58 @@ class Amoeba extends Creature {
       PVector node = (PVector)expandedNodes.get(i);
       ellipse(node.x, node.y, 2, 2);
     }
+  }
+}
+
+/* STATE MACHINE STATES */
+// Keep Amoeba specific classes in this tab
+
+class AmoebaBrainStateForaging extends BrainState {
+
+  AmoebaBrainStateForaging(Creature c) {
+    parentCreature = c;
+    name = "amoeba_brain_state_foraging";
+  }
+
+  void doActions() {
+  }
+
+  String checkConditions() {
+    return "";
+  }
+
+  void entryActions() {
+    print("AmoebaBrainStateForaging entryActions() - ");
+    print("Amoeba is foraging...\n");
+    parentCreature.brainActivity = "Foraging...";
+  }
+
+  void exitActions() {
+  }
+}
+
+class AmoebaBrainStateResting extends BrainState {
+
+  AmoebaBrainStateResting(Creature c) {
+    parentCreature = c;
+    name = "amoeba_brain_state_resting";
+  }
+
+  void doActions() {
+    print("AmoebaBrainStateResting doActions()\n");
+  }
+
+  String checkConditions() {
+    return "";
+  }
+
+  void entryActions() {
+    print("AmoebaBrainStateResting entryActions() - ");
+    print("Amoeba is resting...\n");
+    parentCreature.brainActivity = "Resting...";
+  }
+
+  void exitActions() {
   }
 }
 

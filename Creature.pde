@@ -7,10 +7,12 @@ class Creature {
   int       currentFood;
   int       metabolismRate;
   int       lastTicCount;
+  
 
   boolean   okToUpdateFood;
 
-  Brain brain;
+  Brain  brain;
+  String brainActivity;
 
   Creature() {
     initializeBrain();
@@ -24,13 +26,14 @@ class Creature {
 
   void initializeBrain() {
     brain = new Brain();
+    brainActivity = "Initializing...";
   }
 
   void updateFoodLevel() {
 
     if (metabolismRate == 1) {
       if (timer > lastTicCount) {
-        print("food: " + currentFood + "\n");
+        // print("food: " + currentFood + "\n");
         currentFood -=1;
         lastTicCount = timer;
       }
@@ -41,7 +44,7 @@ class Creature {
         if (timer % metabolismRate == 0) {
           currentFood   -= 1;
           okToUpdateFood = false;
-          print("food: " + currentFood + "\n");
+          // print("food: " + currentFood + "\n");
         }
       }
 
