@@ -967,6 +967,7 @@ class AmoebaBrainStateForaging extends BrainState {
   }
 
   void doActions() {
+    if (debug) print("AmoebaBrainStateForaging doActions()\n");
   }
 
   String checkConditions() {
@@ -974,8 +975,10 @@ class AmoebaBrainStateForaging extends BrainState {
   }
 
   void entryActions() {
-    print("AmoebaBrainStateForaging entryActions() - ");
-    print("Amoeba is foraging...\n");
+    if (debug) {
+      print("AmoebaBrainStateForaging entryActions() - ");
+      print("Amoeba is foraging...\n");
+    }
     parentCreature.brainActivity = "Foraging...";
   }
 
@@ -991,7 +994,7 @@ class AmoebaBrainStateResting extends BrainState {
   }
 
   void doActions() {
-    print("AmoebaBrainStateResting doActions()\n");
+    if (debug) print("AmoebaBrainStateResting doActions()\n");
   }
 
   String checkConditions() {
@@ -999,8 +1002,10 @@ class AmoebaBrainStateResting extends BrainState {
   }
 
   void entryActions() {
-    print("AmoebaBrainStateResting entryActions() - ");
-    print("Amoeba is resting...\n");
+    if (debug) {
+      print("AmoebaBrainStateResting entryActions() - ");
+      print("Amoeba is resting...\n");
+    }
     parentCreature.brainActivity = "Resting...";
   }
 
