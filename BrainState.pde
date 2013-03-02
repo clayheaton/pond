@@ -9,7 +9,9 @@ class BrainState {
   }
 
   String checkConditions() {
-    return "";
+    // An empty string means that the state shouldn't change.
+    // To change states, return the name of the state to which you want to change.
+    return ""; 
   }
 
   void entryActions() {

@@ -1,7 +1,7 @@
 Amoeba a;
 
 int timer;
-int lastMillisCount, millisCount;
+int lastMillisCount;
 
 // Debugging measures
 boolean stopLoop = false;
@@ -14,7 +14,6 @@ void setup() {
   a = new Amoeba(width/2, height/2);
   timer = 0;
   lastMillisCount = 0;
-  millisCount     = 0;
 }
 
 void draw() {
@@ -34,5 +33,15 @@ void draw() {
 
 void mouseClicked() {
   a.setDestination(mouseX, mouseY);
+}
+
+void keyPressed(){
+  
+  // Simulate feeding the amoeba
+  if(key == 'f'){
+   a.currentFood += 10;
+   print("a.currentFood: " + a.currentFood + "\n");
+  }
+  
 }
 

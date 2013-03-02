@@ -1,12 +1,14 @@
 class Creature {
   PVector   position;
   PVector   destination;
-  float     initialArea, currentArea;
+  float     initialSize, initialArea, currentArea;
   int       foodMax;
   int       foodMin;
   int       currentFood;
   int       metabolismRate;
   int       lastTicCount;
+  int       hungerThreshold;
+  int       hungerGoneThreshold;
   
 
   boolean   okToUpdateFood;
@@ -18,8 +20,10 @@ class Creature {
     initializeBrain();
     foodMax              = 100;
     foodMin              = 0;
-    currentFood          = 50;
-    metabolismRate       = 5; // Represents number of seconds between metabolism adjustments; higher == slower
+    currentFood          = 25;
+    hungerThreshold      = 20;
+    hungerGoneThreshold  = 70;
+    metabolismRate       = 2; // Represents number of seconds between metabolism adjustments; higher == slower
     okToUpdateFood       = false;
     lastTicCount         = 0;
   }
@@ -27,6 +31,10 @@ class Creature {
   void initializeBrain() {
     brain = new Brain();
     brainActivity = "Initializing...";
+  }
+  
+  void setDestination(float x, float y){
+    
   }
 
   void updateFoodLevel() {

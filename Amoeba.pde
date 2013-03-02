@@ -1,24 +1,29 @@
 import java.util.*;
 
+// List amoeba brain states here so that we can refer to them
+// as variables in the rest of the code & use this as reference
+String amoebaForaging = "amoeba_brain_state_foraging";
+String amoebaResting  = "amoeba_brain_state_resting";
+
 class Amoeba extends Creature {
-  float size;
+  float   size;
+  PVector footDestination;
+
   int   initialSize     = 80;
   float initialRadius   = initialSize   * 0.5;
   float footTolerance   = initialRadius * 0.5;
   float footTravelLimit = initialSize   * 2.0;
   float footTooClose    = initialSize   * 0.75;
 
-  int       angleTolerance = 45;
-  float     areaTolerance  = 0.2; // Can grow or shrink by 20 percent without triggering a fix
+  int   angleTolerance  = 45;
+  float areaTolerance   = 0.2; // Amoeba area grow or shrink by 20 percent without triggering a fix
 
-  PVector   footDestination;
+  int   numBaseNodes    = 18;
+  int   maxNodes        = 20;
+  int   nodeChainLength = 2;
 
-  int       numBaseNodes    = 18;
-  int       maxNodes        = 20;
-  int       nodeChainLength = 2;
-
-  float     baseAngleSpacing;
-  float     angleSpacing;
+  float baseAngleSpacing;
+  float angleSpacing;
 
   // Protected as references
   ArrayList baseNodes;
@@ -158,11 +163,11 @@ class Amoeba extends Creature {
     AmoebaBrainStateForaging absf = new AmoebaBrainStateForaging(this);
     AmoebaBrainStateResting  absr = new AmoebaBrainStateResting(this);
 
-    brain.addState("amoeba_brain_state_foraging", absf);
-    brain.addState("amoeba_brain_state_resting", absr);
+    brain.addState(amoebaForaging, absf);
+    brain.addState(amoebaResting, absr);
 
     // Set the active state
-    brain.setState("amoeba_brain_state_resting");
+    brain.setState(amoebaResting);
   }
 
 
@@ -956,41 +961,75 @@ class Amoeba extends Creature {
   }
 }
 
+
+
+
+
 /* STATE MACHINE STATES */
 // Keep Amoeba specific classes in this tab
 
 class AmoebaBrainStateForaging extends BrainState {
-
+  PVector lastWayPoint;
+  float   lastAngle;
+  
   AmoebaBrainStateForaging(Creature c) {
     parentCreature = c;
-    name = "amoeba_brain_state_foraging";
+    name = amoebaForaging;
   }
 
   void doActions() {
     if (debug) print("AmoebaBrainStateForaging doActions()\n");
+    
+    // Following waypoints, look for food in detection radius
+    // If food is found, remove waypoints, tell the amoeba where the food is located
+    // and set a condition to exit the foraging action and enter the attacking/eating action
+    
+    // Otherwise, check if still moving.
+    // If not, then calculate a new waypoint, based on the previous,
+    // and set the destination of the amoeba
   }
 
   String checkConditions() {
+    if (parentCreature.currentFood > parentCreature.hungerGoneThreshold){
+     return amoebaResting; 
+    }
     return "";
   }
 
   void entryActions() {
-    if (debug) {
-      print("AmoebaBrainStateForaging entryActions() - ");
-      print("Amoeba is foraging...\n");
-    }
-    parentCreature.brainActivity = "Foraging...";
+    print("Amoeba is entering foraging state...\n");
+    parentCreature.brainActivity = "Foraging...\n";
+    
+    setWayPoint();
+    parentCreature.setDestination(lastWayPoint.x, lastWayPoint.y);
   }
 
   void exitActions() {
+    print("Amoeba is exiting foraging state...\n");
+  }
+  
+  void setWayPoint(){
+    // Calculate a waypoint.
+    // Distance should be between 1.5x initial size and 3x initial size
+    
+    lastAngle          = random(360);
+    float initSize     = parentCreature.initialSize;
+    float distanceMin  = initSize * 1.5;
+    float distanceAdd  = random(distanceMin);
+    float distance     = distanceMin + distanceAdd;
+    lastWayPoint       = parentCreature.positionWith(lastAngle,distance);
   }
 }
+
+
+
+
 
 class AmoebaBrainStateResting extends BrainState {
 
   AmoebaBrainStateResting(Creature c) {
     parentCreature = c;
-    name = "amoeba_brain_state_resting";
+    name = amoebaResting;
   }
 
   void doActions() {
@@ -998,18 +1037,20 @@ class AmoebaBrainStateResting extends BrainState {
   }
 
   String checkConditions() {
+    if (parentCreature.currentFood < parentCreature.hungerThreshold) {
+      // Seek food
+      return amoebaForaging;
+    }
     return "";
   }
 
   void entryActions() {
-    if (debug) {
-      print("AmoebaBrainStateResting entryActions() - ");
-      print("Amoeba is resting...\n");
-    }
+    print("Amoeba is entering resting state...\n");
     parentCreature.brainActivity = "Resting...";
   }
 
   void exitActions() {
+    print("Amoeba is exiting resting state...\n");
   }
 }
 

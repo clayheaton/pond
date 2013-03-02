@@ -15,7 +15,6 @@ class Brain {
 
   void setState(String stateName) {
     if (activeState != null) {
-      print("BrainState: exitActions()\n");
       activeState.exitActions(); // End the brain state
     }
 
