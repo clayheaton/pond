@@ -4,6 +4,7 @@ import java.util.*;
 // as variables in the rest of the code & use this as reference
 String amoebaForaging = "amoeba_brain_state_foraging";
 String amoebaResting  = "amoeba_brain_state_resting";
+String amoebaDying    = "amoeba_brain_state_dying";
 
 class Amoeba extends Creature {
   float   size;
@@ -162,9 +163,11 @@ class Amoeba extends Creature {
 
     AmoebaBrainStateForaging absf = new AmoebaBrainStateForaging(this);
     AmoebaBrainStateResting  absr = new AmoebaBrainStateResting(this);
+    AmoebaBrainStateDying    absd = new AmoebaBrainStateDying(this);
 
     brain.addState(amoebaForaging, absf);
-    brain.addState(amoebaResting, absr);
+    brain.addState(amoebaResting,  absr);
+    brain.addState(amoebaDying,    absd);
 
     // Set the active state
     brain.setState(amoebaResting);
@@ -971,14 +974,15 @@ class Amoeba extends Creature {
 class AmoebaBrainStateForaging extends BrainState {
   PVector lastWayPoint;
   float   lastAngle;
+  Amoeba  parentCreature;
   
   AmoebaBrainStateForaging(Creature c) {
-    parentCreature = c;
+    parentCreature = (Amoeba)c;
     name = amoebaForaging;
   }
 
   void doActions() {
-    if (debug) print("AmoebaBrainStateForaging doActions()\n");
+    // if (debug) print("AmoebaBrainStateForaging doActions()\n");
     
     // Following waypoints, look for food in detection radius
     // If food is found, remove waypoints, tell the amoeba where the food is located
@@ -987,9 +991,17 @@ class AmoebaBrainStateForaging extends BrainState {
     // Otherwise, check if still moving.
     // If not, then calculate a new waypoint, based on the previous,
     // and set the destination of the amoeba
+    if(!parentCreature.isMoving){
+      setWayPoint();
+      parentCreature.setDestination(lastWayPoint.x,lastWayPoint.y);
+    }
   }
 
   String checkConditions() {
+    if (parentCreature.currentFood < parentCreature.foodMin) {
+      return amoebaDying;
+    }
+    
     if (parentCreature.currentFood > parentCreature.hungerGoneThreshold){
      return amoebaResting; 
     }
@@ -1009,15 +1021,27 @@ class AmoebaBrainStateForaging extends BrainState {
   }
   
   void setWayPoint(){
+    lastAngle = random(360);
+    setWayPoint(lastAngle);
+  }
+  
+  void setWayPoint(float angle){
     // Calculate a waypoint.
     // Distance should be between 1.5x initial size and 3x initial size
     
-    lastAngle          = random(360);
+    //lastAngle          = random(360);
     float initSize     = parentCreature.initialSize;
-    float distanceMin  = initSize * 1.5;
+    float distanceMin  = initSize * 0.75;
     float distanceAdd  = random(distanceMin);
     float distance     = distanceMin + distanceAdd;
+    // print("initSize: " + initSize + ", lastAngle: " + lastAngle + ", distance: " + distance + "\n");
     lastWayPoint       = parentCreature.positionWith(lastAngle,distance);
+    lastWayPoint.add(parentCreature.position.get());
+    
+    if(lastWayPoint.x < 0 || lastWayPoint.x > width || lastWayPoint.y < 0 || lastWayPoint.y > height){
+       setWayPoint(); 
+    }
+    
   }
 }
 
@@ -1033,7 +1057,7 @@ class AmoebaBrainStateResting extends BrainState {
   }
 
   void doActions() {
-    if (debug) print("AmoebaBrainStateResting doActions()\n");
+    // if (debug) print("AmoebaBrainStateResting doActions()\n");
   }
 
   String checkConditions() {
@@ -1052,5 +1076,33 @@ class AmoebaBrainStateResting extends BrainState {
   void exitActions() {
     print("Amoeba is exiting resting state...\n");
   }
+}
+
+
+
+
+class AmoebaBrainStateDying extends BrainState {
+  
+   AmoebaBrainStateDying(Creature c) {
+    
+   } 
+   
+   void doActions(){
+     
+   }
+   
+   void entryActions(){
+     print("Amoeba is dying...");
+   }
+   
+   void exitActions(){
+     
+   }
+   
+   String checkConditions(){
+    return ""; 
+   }
+   
+   
 }
 

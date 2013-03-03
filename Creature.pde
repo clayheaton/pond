@@ -1,4 +1,4 @@
-class Creature {
+class Creature extends InteractiveObject {
   PVector   position;
   PVector   destination;
   float     initialSize, initialArea, currentArea;
