@@ -7,9 +7,11 @@ class Creature extends InteractiveObject {
   int       metabolismRate;
   int       hungerThreshold;
   int       hungerGoneThreshold;
+  int       foodDetectionRadius; // Creature will detect food within this distance from its position
   
-
   boolean   okToUpdateFood;
+  
+  InteractiveObject foodTarget;
 
   Brain  brain;
   String brainActivity;
@@ -18,10 +20,12 @@ class Creature extends InteractiveObject {
     initializeBrain();
     foodMax              = 100;
     foodMin              = 0;
-    currentFood          = 25;
-    hungerThreshold      = 20;
+    currentFood          = 55;
+    hungerThreshold      = 50;
     hungerGoneThreshold  = 70;
     metabolismRate       = 2; // Represents number of seconds between metabolism adjustments; higher == slower
+    foodDetectionRadius  = 20;
+    
     okToUpdateFood       = false;
     lastTicCount         = 0;
   }
@@ -56,6 +60,11 @@ class Creature extends InteractiveObject {
 
       if (timer % metabolismRate > 0) okToUpdateFood = true;
     }
+  }
+
+  InteractiveObject findFood() {
+    print("Calling Creature.findFood(). Override in your Creature subclass...\n");
+   return null; 
   }
 
   float creatureArea(ArrayList nodes) { 

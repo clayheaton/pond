@@ -1,3 +1,4 @@
+World  world;
 Amoeba a;
 
 int timer;
@@ -7,10 +8,6 @@ int lastMillisCount;
 boolean stopLoop = false;
 boolean debug    = false;
 
-// Inanimate food
-int     numFoodPellets = 25;
-ArrayList foodPellets;
-
 void setup() {
   size(800, 600);
   smooth();
@@ -18,13 +15,7 @@ void setup() {
   a = new Amoeba(width/2, height/2);
   timer = 0;
   lastMillisCount = 0;
-
-  // Establish food pellets
-  foodPellets = new ArrayList();
-  for (int i=0; i<numFoodPellets; i++) {
-    Food f = new Food();
-    foodPellets.add(f);
-  }
+  world = new World();
 }
 
 void draw() {
@@ -37,11 +28,7 @@ void draw() {
     lastMillisCount = millis();
   }
 
-  // Display the inanimate food pellets
-  for (int i=0; i< foodPellets.size(); i++) {
-    Food f = (Food)foodPellets.get(i); 
-    f.display();
-  }
+  world.displayWorld();
 
   // Amoeba
   a.update();

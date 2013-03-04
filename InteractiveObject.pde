@@ -6,8 +6,24 @@ class InteractiveObject {
   PVector   destination;
   float     initialSize;
   int       lastTicCount;
+  boolean   canFlee = true;
+  
+  int       foodValue = 25;
 
   InteractiveObject() {
+  }
+  
+  void consume(InteractiveObject obj){
+    print("Generic InteractiveObject.consume() method. Implement something more specific in the subclass.\n");
+    obj.beConsumedBy(this);
+  }
+  
+  void beConsumedBy(InteractiveObject obj){
+    print("Generic InteractiveObject.consumedBy() method. Implement something more specific in the subclass.\n");
+  }
+  
+  void die() {
+    print("Generic InteractiveObject die() method. Implement something more specific in the subclass.\n");
   }
 
   // Helper method for calculating positions

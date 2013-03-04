@@ -19,8 +19,10 @@ class Food extends InteractiveObject {
   }
 
   void setUpFood(PVector location) {
-    insidePosition = new PVector(0,0);
-    
+    canFlee = false;
+
+    insidePosition = new PVector(0, 0);
+
     outsidePoints = new ArrayList();
     position = location;
     int   numPoints   = 4 + (int)random(3);
@@ -32,6 +34,11 @@ class Food extends InteractiveObject {
       PVector pt  = positionWith(angle, ptLen);
       outsidePoints.add(pt);
     }
+  }
+
+  void beConsumedBy(InteractiveObject obj) {
+    print("Food consumed.\n");
+    world.removeFood(this);
   }
 
   void display() {
@@ -66,10 +73,10 @@ class Food extends InteractiveObject {
       insidePosition.x = x;
       insidePosition.y = y;
     }
-    
+
     // Draw the center ellipse
     fill(200);
-    ellipse(insidePosition.x,insidePosition.y,2,2);
+    ellipse(insidePosition.x, insidePosition.y, 2, 2);
 
     popMatrix();
   }

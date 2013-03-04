@@ -100,6 +100,9 @@ class Amoeba extends Creature {
     expand              = false;
     contract            = false;
 
+    foodDetectionRadius = initialSize * 2;
+    metabolismRate      = 5;
+
     initializeNodes();
     setUpBrain();
   }
@@ -166,8 +169,8 @@ class Amoeba extends Creature {
     AmoebaBrainStateDying    absd = new AmoebaBrainStateDying(this);
 
     brain.addState(amoebaForaging, absf);
-    brain.addState(amoebaResting,  absr);
-    brain.addState(amoebaDying,    absd);
+    brain.addState(amoebaResting, absr);
+    brain.addState(amoebaDying, absd);
 
     // Set the active state
     brain.setState(amoebaResting);
@@ -209,7 +212,9 @@ class Amoeba extends Creature {
 
 
 
-
+  void setDestination(PVector dest    ) { 
+    setDestination(dest.x, dest.y);
+  }
   void setDestination(float x, float y) {
     destination.x = x;
     destination.y = y;
@@ -833,7 +838,18 @@ class Amoeba extends Creature {
 
       if (setContractedPosition == true) {
         // This should happen while the amoeba is moving
-        float contractedLength = initialRadius - random(footTolerance);
+
+        float offset   = random(footTolerance);
+        if (contract) {
+          offset *= -1;
+        } 
+        else if (!expand) {
+          float dirCheck = random(100);
+          if (dirCheck < 50) offset *= -1;
+        }
+
+
+        float contractedLength = initialRadius + offset;
         contractedNodes.set(index, positionWith(thisAngle, contractedLength));
         indicesToCollapse.set(index, true);
       } 
@@ -892,10 +908,19 @@ class Amoeba extends Creature {
     return selectedIdx;
   }
 
+  /* FORAGING */
+  InteractiveObject findFood() {
+    // Identify all consumables within radius, pick one to eat
+    // Check for creatures && for Food objects -- TODO: creatures
+    InteractiveObject food = world.closestFood(this.position, foodDetectionRadius * 0.5);
+    return food;
+  }
+
+
+
 
 
   /* DRAWING */
-
   void display() {
     pushMatrix();
 
@@ -903,6 +928,7 @@ class Amoeba extends Creature {
     drawBody();
     if (debug) {
       drawNodes();
+      drawFoodDetectionRadius();
     }
     popMatrix();
   }
@@ -962,6 +988,17 @@ class Amoeba extends Creature {
       ellipse(node.x, node.y, 2, 2);
     }
   }
+
+
+
+  void drawFoodDetectionRadius() {
+    popMatrix();
+    stroke(50, 50);
+    noFill();
+    ellipse(position.x, position.y, foodDetectionRadius, foodDetectionRadius);
+    pushMatrix();
+    translate(position.x, position.y);
+  }
 }
 
 
@@ -975,25 +1012,53 @@ class AmoebaBrainStateForaging extends BrainState {
   PVector lastWayPoint;
   float   lastAngle;
   Amoeba  parentCreature;
-  
+  boolean lockedOntoFood;
+
   AmoebaBrainStateForaging(Creature c) {
     parentCreature = (Amoeba)c;
-    name = amoebaForaging;
+    name           = amoebaForaging;
+    lockedOntoFood = false;
   }
 
   void doActions() {
     // if (debug) print("AmoebaBrainStateForaging doActions()\n");
-    
+
     // Following waypoints, look for food in detection radius
     // If food is found, remove waypoints, tell the amoeba where the food is located
     // and set a condition to exit the foraging action and enter the attacking/eating action
-    
+
     // Otherwise, check if still moving.
     // If not, then calculate a new waypoint, based on the previous,
     // and set the destination of the amoeba
-    if(!parentCreature.isMoving){
+
+    // Try to get a food target
+    if (parentCreature.foodTarget == null) {
+      parentCreature.foodTarget = parentCreature.findFood();
+    }
+
+    // If there is a food target and the amoeba isn't moving, we're on top of it
+    if (parentCreature.foodTarget != null && !parentCreature.isMoving) {
+      print("Amoeba arrived at food...\n");
+      parentCreature.consume(parentCreature.foodTarget);
+      parentCreature.currentFood += parentCreature.foodTarget.foodValue;
+      print("Amoeba currentFood level: " + parentCreature.currentFood + "\n");
+      parentCreature.foodTarget = null;
+      lockedOntoFood = false;
+      return;
+    }
+
+    if (parentCreature.foodTarget != null && lockedOntoFood == false) {
+      // Set destination to food target 
+      print("Found food for amoeba...\n");
+      parentCreature.setDestination(parentCreature.foodTarget.position);
+      lockedOntoFood = true;
+      return;
+    }
+
+    if (!parentCreature.isMoving) {
       setWayPoint(lastAngle);
-      parentCreature.setDestination(lastWayPoint.x,lastWayPoint.y);
+      parentCreature.setDestination(lastWayPoint.x, lastWayPoint.y);
+      return;
     }
   }
 
@@ -1001,9 +1066,9 @@ class AmoebaBrainStateForaging extends BrainState {
     if (parentCreature.currentFood < parentCreature.foodMin) {
       return amoebaDying;
     }
-    
-    if (parentCreature.currentFood > parentCreature.hungerGoneThreshold){
-     return amoebaResting; 
+
+    if (parentCreature.currentFood > parentCreature.hungerGoneThreshold) {
+      return amoebaResting;
     }
     return "";
   }
@@ -1011,7 +1076,7 @@ class AmoebaBrainStateForaging extends BrainState {
   void entryActions() {
     print("Amoeba is entering foraging state...\n");
     parentCreature.brainActivity = "Foraging...\n";
-    
+
     setWayPoint();
     parentCreature.setDestination(lastWayPoint.x, lastWayPoint.y);
   }
@@ -1019,31 +1084,31 @@ class AmoebaBrainStateForaging extends BrainState {
   void exitActions() {
     print("Amoeba is exiting foraging state...\n");
   }
-  
-  void setWayPoint(){
+
+  void setWayPoint() {
     lastAngle = random(360);
     setWayPoint(lastAngle);
   }
-  
-  void setWayPoint(float angle){
+
+  void setWayPoint(float angle) {
     // Calculate a waypoint.
     // Angle should be within 45 degrees of the last angle
-    
-    float angleOffset  = random(45);
+
+      float angleOffset  = random(45);
     lastAngle          = lastAngle + angleOffset;
-    
+
     float initSize     = parentCreature.initialSize;
     float distanceMin  = initSize * 0.75;
     float distanceAdd  = random(distanceMin);
     float distance     = distanceMin + distanceAdd;
-    // print("initSize: " + initSize + ", lastAngle: " + lastAngle + ", distance: " + distance + "\n");
-    lastWayPoint       = parentCreature.positionWith(lastAngle,distance);
+
+    lastWayPoint       = parentCreature.positionWith(lastAngle, distance);
     lastWayPoint.add(parentCreature.position.get());
-    
-    if(lastWayPoint.x < 0 || lastWayPoint.x > width || lastWayPoint.y < 0 || lastWayPoint.y > height){
-       setWayPoint(); 
+
+    // If the waypoint is off of the screen, then create a new one with no angle bounds
+    if (lastWayPoint.x < 0 || lastWayPoint.x > width || lastWayPoint.y < 0 || lastWayPoint.y > height ) {
+      setWayPoint();
     }
-    
   }
 }
 
@@ -1054,7 +1119,7 @@ class AmoebaBrainStateForaging extends BrainState {
 class AmoebaBrainStateResting extends BrainState {
 
   AmoebaBrainStateResting(Creature c) {
-    parentCreature = c;
+    parentCreature = (Amoeba)c;
     name = amoebaResting;
   }
 
@@ -1084,27 +1149,26 @@ class AmoebaBrainStateResting extends BrainState {
 
 
 class AmoebaBrainStateDying extends BrainState {
-  
-   AmoebaBrainStateDying(Creature c) {
-    
-   } 
-   
-   void doActions(){
-     
-   }
-   
-   void entryActions(){
-     print("Amoeba is dying...");
-   }
-   
-   void exitActions(){
-     
-   }
-   
-   String checkConditions(){
-    return ""; 
-   }
-   
-   
+
+  AmoebaBrainStateDying(Creature c) {
+    parentCreature = (Amoeba)c;
+    name = amoebaDying;
+  } 
+
+  void doActions() {
+    // Check death - Exit action of deallocating if dead.
+  }
+
+  void entryActions() {
+    print("Amoeba is dying... ");
+    parentCreature.die();
+  }
+
+  void exitActions() {
+  }
+
+  String checkConditions() {
+    return "";
+  }
 }
 
