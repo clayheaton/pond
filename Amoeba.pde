@@ -10,7 +10,7 @@ class Amoeba extends Creature {
   float   size;
   PVector footDestination;
 
-  int   initialSize     = 80;
+  int   initialSize     = 30 + (int)random(50);
   float initialRadius   = initialSize   * 0.5;
   float footTolerance   = initialRadius * 0.5;
   float footTravelLimit = initialSize   * 2.0;
@@ -992,7 +992,7 @@ class AmoebaBrainStateForaging extends BrainState {
     // If not, then calculate a new waypoint, based on the previous,
     // and set the destination of the amoeba
     if(!parentCreature.isMoving){
-      setWayPoint();
+      setWayPoint(lastAngle);
       parentCreature.setDestination(lastWayPoint.x,lastWayPoint.y);
     }
   }
@@ -1027,9 +1027,11 @@ class AmoebaBrainStateForaging extends BrainState {
   
   void setWayPoint(float angle){
     // Calculate a waypoint.
-    // Distance should be between 1.5x initial size and 3x initial size
+    // Angle should be within 45 degrees of the last angle
     
-    //lastAngle          = random(360);
+    float angleOffset  = random(45);
+    lastAngle          = lastAngle + angleOffset;
+    
     float initSize     = parentCreature.initialSize;
     float distanceMin  = initSize * 0.75;
     float distanceAdd  = random(distanceMin);
